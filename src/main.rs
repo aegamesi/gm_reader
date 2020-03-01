@@ -5,8 +5,6 @@ use std::io::BufReader;
 mod project;
 mod gmstream;
 
-use gmstream::GmStream;
-
 struct Config {
     filename: String,
 }
@@ -34,9 +32,7 @@ fn main() -> Result<(), std::io::Error> {
     println!("Reading {}", config.filename);
     let file = File::open(config.filename)?;
     let file = BufReader::new(file);
-
-    let wrapped = Box::new(file);
-    let project = project::Project::parse(wrapped)?;
+    let project = project::Project::parse(file)?;
 
     println!("Version: {:?}", project.version);
 

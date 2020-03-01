@@ -1,12 +1,12 @@
-use std::io::{Read, Seek};
+use std::io::{Read, Take};
 
 extern crate byteorder;
 
 use byteorder::{ReadBytesExt, LittleEndian};
 use std::io;
+use flate2::read::ZlibDecoder;
 
-
-pub trait GmStream: Read + Seek {
+pub trait GmStream: Sized {
     fn read_u32(&mut self) -> io::Result<u32>;
 
     fn read_u16(&mut self) -> io::Result<u16>;
@@ -18,9 +18,13 @@ pub trait GmStream: Read + Seek {
     fn read_string(&mut self) -> io::Result<String>;
 
     fn read_f64(&mut self) -> io::Result<f64>;
+
+    fn skip(&mut self, bytes: u64) -> io::Result<()>;
+
+    fn read_compressed(&mut self) -> io::Result<ZlibDecoder<Take<&mut Self>>>;
 }
 
-impl<T> GmStream for T where T: Read + Seek {
+impl<T: Read> GmStream for T {
     fn read_u32(&mut self) -> io::Result<u32> {
         ReadBytesExt::read_u32::<LittleEndian>(self)
     }
@@ -46,5 +50,21 @@ impl<T> GmStream for T where T: Read + Seek {
 
     fn read_f64(&mut self) -> io::Result<f64> {
         ReadBytesExt::read_f64::<LittleEndian>(self)
+    }
+
+    fn skip(&mut self, bytes: u64) -> io::Result<()> {
+        let mut sub = self.take(bytes as u64);
+        match io::copy(&mut sub, &mut io::sink()) {
+            Err(e) => Err(e),
+            Ok(_) => Ok(())
+        }
+    }
+
+    fn read_compressed(&mut self) -> io::Result<ZlibDecoder<Take<&mut T>>> {
+        let length = GmStream::read_u32(self)?;
+        let substream = self.take(length as u64);
+        let decoder = ZlibDecoder::new(substream);
+
+        Ok(decoder)
     }
 }
