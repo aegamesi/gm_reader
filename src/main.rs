@@ -1,5 +1,11 @@
 use std::{env, process};
 use std::fs::File;
+use std::io::BufReader;
+
+mod project;
+mod gmstream;
+
+use gmstream::GmStream;
 
 struct Config {
     filename: String,
@@ -17,7 +23,7 @@ impl Config {
     }
 }
 
-fn main() {
+fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = env::args().collect();
 
     let config = Config::new(&args).unwrap_or_else(|err| {
@@ -26,4 +32,13 @@ fn main() {
     });
 
     println!("Reading {}", config.filename);
+    let file = File::open(config.filename)?;
+    let file = BufReader::new(file);
+
+    let wrapped = Box::new(file);
+    let project = project::Project::parse(wrapped)?;
+
+    println!("Version: {:?}", project.version);
+
+    Ok(())
 }
