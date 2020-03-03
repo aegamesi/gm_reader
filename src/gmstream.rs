@@ -19,7 +19,7 @@ pub trait GmStream: Sized {
 
     fn read_f64(&mut self) -> io::Result<f64>;
 
-    fn skip(&mut self, bytes: u64) -> io::Result<()>;
+    fn skip(&mut self, bytes: u32) -> io::Result<()>;
 
     fn read_compressed(&mut self) -> io::Result<ZlibDecoder<Take<&mut Self>>>;
 }
@@ -52,7 +52,8 @@ impl<T: Read> GmStream for T {
         ReadBytesExt::read_f64::<LittleEndian>(self)
     }
 
-    fn skip(&mut self, bytes: u64) -> io::Result<()> {
+    fn skip(&mut self, bytes: u32) -> io::Result<()> {
+        println!("Skipping {} bytes", bytes);
         let mut sub = self.take(bytes as u64);
         match io::copy(&mut sub, &mut io::sink()) {
             Err(e) => Err(e),
