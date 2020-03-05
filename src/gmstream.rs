@@ -22,6 +22,8 @@ pub trait GmStream: Sized {
     fn skip(&mut self, bytes: u32) -> io::Result<()>;
 
     fn read_compressed(&mut self) -> io::Result<ZlibDecoder<Take<&mut Self>>>;
+
+    fn skip_section(&mut self) -> io::Result<()>;
 }
 
 impl<T: Read> GmStream for T {
@@ -53,12 +55,17 @@ impl<T: Read> GmStream for T {
     }
 
     fn skip(&mut self, bytes: u32) -> io::Result<()> {
-        println!("Skipping {} bytes", bytes);
+        // println!("Skipping {} bytes", bytes);
         let mut sub = self.take(bytes as u64);
         match io::copy(&mut sub, &mut io::sink()) {
             Err(e) => Err(e),
             Ok(_) => Ok(())
         }
+    }
+
+    fn skip_section(&mut self) -> io::Result<()> {
+        let length = GmStream::read_u32(self)?;
+        self.skip(length)
     }
 
     fn read_compressed(&mut self) -> io::Result<ZlibDecoder<Take<&mut T>>> {

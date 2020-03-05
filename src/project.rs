@@ -96,16 +96,89 @@ impl Project {
         println!("Decrypting inner...");
         let mut stream = decrypt_gm800(stream)?;
 
-        let mut sum: u64 = 0;
-        loop {
-            if let Ok(a) = stream.read_u32() {
-                sum += a as u64;
-            } else {
-                break;
-            }
-        }
-        println!("sum {}", sum);
+        // Skip junk
+        let len = stream.read_u32()?;
+        stream.skip(len * 4)?;
 
+        let _pro = stream.read_bool()?;
+        let _game_id = stream.read_u32()?;
+        stream.skip(16)?;
+
+        println!("Reading extensions...");
+        let _version = stream.read_u32()?;
+        let num_extensions = stream.read_u32()?;
+        for _ in 0..num_extensions {
+            stream.skip(4)?;
+            println!("Extension Name: {}", stream.read_string()?);
+            stream.skip_section()?;
+
+            let count = stream.read_u32()?;
+            for _ in 0..count {
+                stream.skip(4)?;
+                stream.skip_section()?;
+                stream.skip(4)?;
+                stream.skip_section()?;
+                stream.skip_section()?;
+
+                // Args?
+                let count = stream.read_u32()?;
+                for _ in 0..count {
+                    stream.skip(4)?;
+                    stream.skip_section()?;
+                    stream.skip_section()?;
+                    stream.skip(4 * 3)?;
+
+                    stream.skip(4 * 18)?;
+                }
+
+                // Constants
+                let count = stream.read_u32()?;
+                for _ in 0..count {
+                    stream.skip(4)?;
+                    stream.skip_section()?;
+                    stream.skip_section()?;
+                }
+            }
+
+            // read resources files?
+            stream.skip_section()?;
+        }
+
+        println!("Reading triggers...");
+        let _version = stream.read_u32()?;
+        let num_triggers = stream.read_u32()?;
+        for _ in 0..num_triggers {
+            stream.skip_section()?;
+            // TODO read triggers
+        }
+
+        println!("Reading constants...");
+        let _version = stream.read_u32()?;
+        let num_constants = stream.read_u32()?;
+        for _ in 0..num_constants {
+            let name = stream.read_string()?;
+            let value = stream.read_string()?;
+            println!("Constant: {}: {}", name, value);
+        }
+
+        println!("Reading sounds...");
+        let _version = stream.read_u32()?;
+        let num_sounds = stream.read_u32()?;
+        for _ in 0..num_sounds {
+            stream.skip_section()?;
+        }
+
+        println!("Reading sprites...");
+        let _version = stream.read_u32()?;
+        let num_sprites = stream.read_u32()?;
+        for _ in 0..num_sprites {
+            let mut section = stream.read_compressed()?;
+            if section.read_bool()? {
+                let name = section.read_string()?;
+                println!("Sprite name: {}", name);
+            }
+            drain(section)?;
+        }
 
         println!("Done");
         // println!("#### {}", stream.read_string()?);
