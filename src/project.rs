@@ -14,11 +14,8 @@ pub struct Project {
     pub version: Version
 }
 
-fn drain<T: Read>(s: ZlibDecoder<Take<&mut T>>) -> io::Result<()> {
-    match io::copy(&mut s.into_inner(), &mut io::sink()) {
-        Err(e) => Err(e),
-        Ok(_) => Ok(())
-    }
+fn drain<T: Read>(mut s: ZlibDecoder<Take<&mut T>>) -> io::Result<u64> {
+    io::copy(&mut s, &mut io::sink())
 }
 
 fn decrypt_gm800<T: Read>(mut stream: T) -> io::Result<Cursor<Vec<u8>>> {
@@ -178,6 +175,63 @@ impl Project {
                 println!("Sprite name: {}", name);
             }
             drain(section)?;
+        }
+
+        println!("Reading backgrounds...");
+        let _version = stream.read_u32()?;
+        let num_backgrounds = stream.read_u32()?;
+        for _ in 0..num_backgrounds {
+            let mut section = stream.read_compressed()?;
+            if section.read_bool()? {
+                let name = section.read_string()?;
+                println!("Background name: {}", name);
+            }
+            drain(section)?;
+        }
+
+        println!("Reading paths...");
+        let _version = stream.read_u32()?;
+        let num_paths = stream.read_u32()?;
+        for _ in 0..num_paths {
+            let mut section = stream.read_compressed()?;
+            if section.read_bool()? {
+                let name = section.read_string()?;
+                println!("Path name: {}", name);
+            }
+            drain(section)?;
+        }
+
+        println!("Reading scripts...");
+        let _version = stream.read_u32()?;
+        let num_scripts = stream.read_u32()?;
+        for _ in 0..num_scripts {
+            let mut section = stream.read_compressed()?;
+            if section.read_bool()? {
+                let name = section.read_string()?;
+                println!("Script name: {}", name);
+            }
+            drain(section)?;
+        }
+
+        println!("Reading fonts...");
+        let _version = stream.read_u32()?;
+        let num_fonts = stream.read_u32()?;
+        for _ in 0..num_fonts {
+            let mut section = stream.read_compressed()?;
+            if section.read_bool()? {
+                let name = section.read_string()?;
+                let _version = section.read_u32()?;
+                let font_name = section.read_string()?;
+                println!("Font name: {} : {}", name, font_name);
+                let size = section.read_u32()?;
+                let bold = section.read_u32()?;
+                let italic = section.read_u32()?;
+                let range_start = section.read_u32()?;
+                let range_end = section.read_u32()?;
+                println!("Size {}, Bold {}, Italic {}, Start {}, End {}", size, bold, italic, range_start, range_end);
+            }
+            let drained = drain(section)?;
+            println!("Drained: {}", drained);
         }
 
         println!("Done");
