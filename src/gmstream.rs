@@ -1,6 +1,7 @@
 use std::io::{Read, Take};
 
 extern crate byteorder;
+extern crate encoding_rs;
 
 use byteorder::{ReadBytesExt, LittleEndian};
 use std::io;
@@ -45,8 +46,10 @@ impl<T: Read> GmStream for T {
 
     fn read_string(&mut self) -> io::Result<String> {
         let length = GmStream::read_u32(self)?;
-        let mut string = String::with_capacity(length as usize);
-        self.take(length as u64).read_to_string(&mut string)?;
+        let mut data = Vec::with_capacity(length as usize);
+        self.take(length as u64).read_to_end(&mut data)?;
+        let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(&data);
+        let string = decoded.to_string();
         Ok(string)
     }
 
