@@ -1,8 +1,7 @@
-use std::io::{SeekFrom, Seek, Read, Take, Cursor};
+use std::io::{SeekFrom, Seek, Read, Cursor};
 use crate::project::Version::Gm800;
 use std::io;
 use crate::gmstream::GmStream;
-use flate2::read::ZlibDecoder;
 
 #[derive(Debug)]
 pub enum Version {
@@ -14,7 +13,7 @@ pub struct Project {
     pub version: Version
 }
 
-fn drain<T: Read>(mut s: ZlibDecoder<Take<&mut T>>) -> io::Result<u64> {
+fn drain<T: Read>(mut s: T) -> io::Result<u64> {
     io::copy(&mut s, &mut io::sink())
 }
 
@@ -60,7 +59,6 @@ fn decrypt_gm800<T: Read>(mut stream: T) -> io::Result<Cursor<Vec<u8>>> {
 
     Ok(Cursor::new(buf))
 }
-
 
 impl Project {
     fn detect_gm800<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
@@ -230,9 +228,83 @@ impl Project {
                 let range_end = section.read_u32()?;
                 println!("Size {}, Bold {}, Italic {}, Start {}, End {}", size, bold, italic, range_start, range_end);
             }
-            let drained = drain(section)?;
-            println!("Drained: {}", drained);
+            drain(section)?;
         }
+
+        println!("Reading timelines...");
+        let _version = stream.read_u32()?;
+        let num_timelines = stream.read_u32()?;
+        for _ in 0..num_timelines {
+            let mut section = stream.read_compressed()?;
+            if section.read_bool()? {
+                let name = section.read_string()?;
+                println!("Timeline name: {}", name);
+            }
+            drain(section)?;
+        }
+
+        println!("Reading objects...");
+        let _version = stream.read_u32()?;
+        let num_objects = stream.read_u32()?;
+        for _ in 0..num_objects {
+            let mut section = stream.read_compressed()?;
+            if section.read_bool()? {
+                let name = section.read_string()?;
+                println!("Object name: {}", name);
+            }
+            drain(section)?;
+        }
+
+        println!("Reading rooms...");
+        let _version = stream.read_u32()?;
+        let num_rooms = stream.read_u32()?;
+        for _ in 0..num_rooms {
+            let mut section = stream.read_compressed()?;
+            if section.read_bool()? {
+                let name = section.read_string()?;
+                println!("Room name: {}", name);
+            }
+            drain(section)?;
+        }
+
+        let _last_object_id = stream.read_u32()?;
+        let _last_tile_id = stream.read_u32()?;
+        println!("Last object: {}, last tile: {}", _last_object_id, _last_tile_id);
+
+        println!("Reading includes...");
+        let _version = stream.read_u32()?;
+        let num_includes = stream.read_u32()?;
+        for _ in 0..num_includes {
+            let mut section = stream.read_compressed()?;
+            if section.read_bool()? {
+                let name = section.read_string()?;
+                println!("Include name: {}", name);
+            }
+            drain(section)?;
+        }
+
+        println!("Reading help...");
+        let _version = stream.read_u32()?;
+        stream.skip_section()?;
+
+        println!("Reading library init code...");
+        let _version = stream.read_u32()?;
+        let num_inits = stream.read_u32()?;
+        for _ in 0..num_inits {
+            // println!("Library init: {}", stream.read_string()?);
+            stream.skip_section()?;
+        }
+
+        println!("Reading room order...");
+        let _version = stream.read_u32()?;
+        let num_rooms = stream.read_u32()?;
+        for _ in 0..num_rooms {
+            let _order = stream.read_u32()?;
+            // println!("room {}", _order);
+        }
+
+        let remaining = drain(stream)?;
+        println!("Remaining bytes: {}", remaining);
 
         println!("Done");
         // println!("#### {}", stream.read_string()?);
