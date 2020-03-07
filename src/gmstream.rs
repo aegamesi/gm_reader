@@ -1,10 +1,9 @@
-use std::io::{Read, Take};
-
 extern crate byteorder;
 extern crate encoding_rs;
 
-use byteorder::{ReadBytesExt, LittleEndian};
 use std::io;
+use std::io::{Read, Take};
+use byteorder::{ReadBytesExt, LittleEndian};
 use flate2::read::ZlibDecoder;
 
 pub trait GmStream: Sized {

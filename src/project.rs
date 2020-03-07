@@ -1,6 +1,10 @@
-use std::io::{SeekFrom, Seek, Read, Cursor};
+extern crate crc;
+extern crate byteorder;
+
 use std::io;
+use std::io::{SeekFrom, Seek, Read, Cursor};
 use crate::gmstream::GmStream;
+use byteorder::ByteOrder;
 
 #[derive(Debug)]
 pub enum Version {
@@ -17,7 +21,7 @@ fn drain<T: Read>(mut s: T) -> io::Result<u64> {
     io::copy(&mut s, &mut io::sink())
 }
 
-fn decrypt_gm800<T: Read>(mut stream: T) -> io::Result<Cursor<Vec<u8>>> {
+fn decrypt_gm8xx<T: Read>(mut stream: T) -> io::Result<Cursor<Vec<u8>>> {
     let mut forward_table: [u8; 256] = [0; 256];
     let mut reverse_table: [u8; 256] = [0; 256];
 
@@ -60,6 +64,49 @@ fn decrypt_gm800<T: Read>(mut stream: T) -> io::Result<Cursor<Vec<u8>>> {
     Ok(Cursor::new(buf))
 }
 
+fn decrypt_gm810<T: Read + Seek>(stream: &mut T) -> io::Result<Cursor<Vec<u8>>> {
+    // Generate seeds
+    let key = format!("_MJD{}#RWK", stream.read_u32()?);
+    let mut key_buffer = Vec::new();
+    for b in key.bytes() {
+        key_buffer.push(b);
+        key_buffer.push(0);
+    }
+    let mut seed2: u32 = crc::crc32::checksum_ieee(&key_buffer) ^ 0xFFFFFFFF;
+    let mut seed1: u32 = stream.read_u32()?;
+
+    // Read version
+    let mut version = stream.read_u32()?;
+    let mut pos = stream.seek(SeekFrom::Current(0))? as u32;
+    pos -= 4 + 0x0039FBC4 + 0x11;
+    if pos == 0 {
+        pos += 3;
+    }
+    pos = ((pos as i32) >> 2) as u32;
+    version = version ^ pos;
+    assert_eq!(version, 810);
+
+    // Decrypt.
+    let mut buf: Vec<u8> = Vec::new();
+    stream.read_to_end(&mut buf)?;
+
+    let mut pos = ((seed2 & 0xFF) + 6) as usize;
+    println!("pos: {}", pos);
+    while pos <= buf.len() - 4 {
+        let chunk = &mut buf[pos..(pos + 4)];
+        pos += 4;
+
+        let input = byteorder::LittleEndian::read_u32(chunk);
+        seed1 = (0xFFFF & seed1) * 0x9069 + (seed1 >> 16);
+        seed2 = (0xFFFF & seed2) * 0x4650 + (seed2 >> 16);
+        let mask = (seed1 << 16) + (seed2 & 0xFFFF);
+        let output = input ^ mask;
+        byteorder::LittleEndian::write_u32(chunk, output);
+    }
+
+    Ok(Cursor::new(buf))
+}
+
 impl Project {
     fn detect_gm800<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
         stream.seek(SeekFrom::Start(2000000))?;
@@ -82,12 +129,12 @@ impl Project {
     }
 
     fn parse_gm8xx<T: Read + Seek>(&mut self, mut stream: T) -> io::Result<()> {
-        Project::detect_gm800(&mut stream)?;
-
         println!("Reading header...");
+        if let Version::Gm810 = self.version {
+            stream.read_u32()?;
+        }
         let _version = stream.read_u32()?;
         let _debug = stream.read_u32()?;
-        assert_eq!(_version, 800);
 
         println!("Reading settings...");
         let _version = stream.read_u32()?;
@@ -103,7 +150,7 @@ impl Project {
 
         // Do the main "decryption".
         println!("Decrypting inner...");
-        let mut stream = decrypt_gm800(stream)?;
+        let mut stream = decrypt_gm8xx(stream)?;
 
         // Skip junk
         let len = stream.read_u32()?;
@@ -338,6 +385,8 @@ impl Project {
         } else if Project::detect_gm810(&mut stream)? {
             println!("Detected GM 8.1 Exe");
             project.version = Version::Gm810;
+            let mut stream = decrypt_gm810(&mut stream)?;
+            project.parse_gm8xx(&mut stream)?;
         } else {
             println!("Unknown file");
         }
