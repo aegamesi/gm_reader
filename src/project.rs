@@ -1,5 +1,4 @@
 use std::io::{SeekFrom, Seek, Read, Cursor};
-use crate::project::Version::Gm800;
 use std::io;
 use crate::gmstream::GmStream;
 
@@ -7,6 +6,7 @@ use crate::gmstream::GmStream;
 pub enum Version {
     Unknown = 0,
     Gm800 = 800,
+    Gm810 = 810,
 }
 
 pub struct Project {
@@ -67,7 +67,21 @@ impl Project {
         Ok(stream.read_u32()? == 1234321)
     }
 
-    fn parse_gm800<T: Read + Seek>(&mut self, mut stream: T) -> io::Result<()> {
+    fn detect_gm810<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
+        stream.seek(SeekFrom::Start(0x0039FBC4))?;
+
+        for _ in 0..1024 {
+            if stream.read_u32()? & 0xFF00FF00 == 0xF7000000 {
+                if stream.read_u32()? & 0x00FF00FF == 0x00140067 {
+                    return Ok(true)
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn parse_gm8xx<T: Read + Seek>(&mut self, mut stream: T) -> io::Result<()> {
         Project::detect_gm800(&mut stream)?;
 
         println!("Reading header...");
@@ -319,8 +333,11 @@ impl Project {
 
         if Project::detect_gm800(&mut stream)? {
             println!("Detected GM 8.0 Exe");
-            project.version = Gm800;
-            project.parse_gm800(&mut stream)?;
+            project.version = Version::Gm800;
+            project.parse_gm8xx(&mut stream)?;
+        } else if Project::detect_gm810(&mut stream)? {
+            println!("Detected GM 8.1 Exe");
+            project.version = Version::Gm810;
         } else {
             println!("Unknown file");
         }
