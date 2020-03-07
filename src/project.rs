@@ -285,8 +285,15 @@ impl Project {
                 let size = section.read_u32()?;
                 let bold = section.read_u32()?;
                 let italic = section.read_u32()?;
-                let range_start = section.read_u32()?;
+                let mut range_start = section.read_u32()?;
                 let range_end = section.read_u32()?;
+
+                if let Version::Gm810 = self.version {
+                    let _charset = range_start & 0xFF000000;
+                    let _aa_level = range_start & 0x00FF0000;
+                    range_start &= 0x0000FFFF;
+                }
+
                 println!("Size {}, Bold {}, Italic {}, Start {}, End {}", size, bold, italic, range_start, range_end);
             }
             drain(section)?;
