@@ -5,13 +5,13 @@ use std::io;
 use std::io::{SeekFrom, Seek, Read, Cursor};
 use crate::gmstream::GmStream;
 use byteorder::ByteOrder;
-use std::fs::File;
 
 #[derive(Debug)]
 pub enum Version {
     Unknown = 0,
     Gm530 = 530,
     Gm600 = 600,
+    Gm700 = 700,
     Gm800 = 800,
     Gm810 = 810,
 }
@@ -180,6 +180,12 @@ impl Project {
         }
 
         Ok(true)
+    }
+
+    fn detect_gm700<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
+        stream.seek(SeekFrom::Start(1980000))?;
+
+        Ok(stream.read_u32()? == 1234321)
     }
 
     fn parse_gm8xx<T: Read + Seek>(&mut self, mut stream: T) -> io::Result<()> {
@@ -453,6 +459,9 @@ impl Project {
         } else if Project::detect_gm6xx(&mut stream)? {
             println!("Detected GM 6.0/6.1 Exe");
             project.version = Version::Gm600;
+        } else if Project::detect_gm700(&mut stream)? {
+            println!("Detected GM 7.0 Exe");
+            project.version = Version::Gm700;
         } else if Project::detect_gm800(&mut stream)? {
             println!("Detected GM 8.0 Exe");
             project.version = Version::Gm800;
