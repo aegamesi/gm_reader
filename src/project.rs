@@ -9,6 +9,7 @@ use byteorder::ByteOrder;
 #[derive(Debug)]
 pub enum Version {
     Unknown = 0,
+    Gm530 = 530,
     Gm600 = 600,
     Gm800 = 800,
     Gm810 = 810,
@@ -140,6 +141,16 @@ impl Project {
             }
         }
         Ok(false)
+    }
+
+    fn detect_gm530<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
+        stream.seek(SeekFrom::Start(1500000))?;
+        let magic = stream.read_u32()?;
+        if magic != 1230500 {
+            return Ok(false)
+        }
+
+        Ok(true)
     }
 
     fn parse_gm8xx<T: Read + Seek>(&mut self, mut stream: T) -> io::Result<()> {
@@ -399,7 +410,10 @@ impl Project {
             version: Version::Unknown,
         };
 
-        if Project::detect_gm6xx(&mut stream)? {
+        if Project::detect_gm530(&mut stream)? {
+            println!("Detected GM 5.3A Exe");
+            project.version = Version::Gm530;
+        } else if Project::detect_gm6xx(&mut stream)? {
             println!("Detected GM 6.0/6.1 Exe");
             project.version = Version::Gm600;
         } else if Project::detect_gm800(&mut stream)? {
