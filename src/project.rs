@@ -5,6 +5,7 @@ use std::io;
 use std::io::{SeekFrom, Seek, Read, Cursor};
 use crate::gmstream::GmStream;
 use byteorder::ByteOrder;
+use std::fs::File;
 
 #[derive(Debug)]
 pub enum Version {
@@ -104,6 +105,34 @@ fn decrypt_gm810<T: Read + Seek>(stream: &mut T) -> io::Result<Cursor<Vec<u8>>> 
         let mask = (seed1 << 16) + (seed2 & 0xFFFF);
         let output = input ^ mask;
         byteorder::LittleEndian::write_u32(chunk, output);
+    }
+
+    Ok(Cursor::new(buf))
+}
+
+fn decrypt_gm530<T: Read + Seek>(stream: &mut T, key: u32) -> io::Result<Cursor<Vec<u8>>> {
+    let mut arr0: [u32; 256] = [0; 256];
+    let mut arr1: [u32; 256] = [0; 256];
+
+    for i in 0..256 {
+        arr0[i] = i as u32;
+    }
+    for i in 1..10001 {
+        let j = ((i * key) % 254 + 1) as usize;
+        let k = arr0[j];
+        arr0[j] = arr0[j + 1];
+        arr0[j + 1] = k;
+    }
+    for i in 1..256 {
+        arr1[arr0[i] as usize] = i as u32;
+    }
+
+    // Decrypt.
+    let mut buf: Vec<u8> = Vec::new();
+    stream.read_to_end(&mut buf)?;
+
+    for i in 0..buf.len() {
+        buf[i] = arr1[buf[i] as usize] as u8;
     }
 
     Ok(Cursor::new(buf))
@@ -413,6 +442,14 @@ impl Project {
         if Project::detect_gm530(&mut stream)? {
             println!("Detected GM 5.3A Exe");
             project.version = Version::Gm530;
+
+            let key = stream.read_u32()?;
+            let mut stream = decrypt_gm530(&mut stream, key)?;
+
+            let _ = stream.read_u32()?;
+            stream.skip_section()?;
+
+            // At this point, stream contains a V 5.3a GMD.
         } else if Project::detect_gm6xx(&mut stream)? {
             println!("Detected GM 6.0/6.1 Exe");
             project.version = Version::Gm600;
