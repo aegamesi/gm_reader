@@ -1,9 +1,9 @@
-use std::{env, process};
 use std::fs::File;
 use std::io::BufReader;
+use std::{env, process};
 
+mod decoder;
 mod project;
-mod gmstream;
 
 struct Config {
     filename: String,
@@ -32,7 +32,7 @@ fn main() -> Result<(), std::io::Error> {
     println!("Reading {}", config.filename);
     let file = File::open(config.filename)?;
     let file = BufReader::new(file);
-    let project = project::Project::parse(file)?;
+    let project = decoder::decode(file)?;
 
     println!("Version: {:?}", project.version);
 

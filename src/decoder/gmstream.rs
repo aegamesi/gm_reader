@@ -1,10 +1,10 @@
 extern crate byteorder;
 extern crate encoding_rs;
 
+use byteorder::{LittleEndian, ReadBytesExt};
+use flate2::read::ZlibDecoder;
 use std::io;
 use std::io::{Read, Take};
-use byteorder::{ReadBytesExt, LittleEndian};
-use flate2::read::ZlibDecoder;
 
 pub trait GmStream: Sized {
     fn read_u32(&mut self) -> io::Result<u32>;
@@ -61,13 +61,8 @@ impl<T: Read> GmStream for T {
         let mut sub = self.take(bytes as u64);
         match io::copy(&mut sub, &mut io::sink()) {
             Err(e) => Err(e),
-            Ok(_) => Ok(())
+            Ok(_) => Ok(()),
         }
-    }
-
-    fn skip_section(&mut self) -> io::Result<()> {
-        let length = GmStream::read_u32(self)?;
-        self.skip(length)
     }
 
     fn read_compressed(&mut self) -> io::Result<ZlibDecoder<Take<&mut T>>> {
@@ -76,5 +71,10 @@ impl<T: Read> GmStream for T {
         let decoder = ZlibDecoder::new(substream);
 
         Ok(decoder)
+    }
+
+    fn skip_section(&mut self) -> io::Result<()> {
+        let length = GmStream::read_u32(self)?;
+        self.skip(length)
     }
 }
