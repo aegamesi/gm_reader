@@ -1,11 +1,9 @@
-extern crate byteorder;
 extern crate crc;
 
 mod gmstream;
 
 use gmstream::GmStream;
 use crate::project::{Project, Version};
-use byteorder::ByteOrder;
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -18,8 +16,8 @@ fn decrypt_gm8xx<T: Read>(mut stream: T) -> io::Result<Cursor<Vec<u8>>> {
     let mut reverse_table: [u8; 256] = [0; 256];
 
     // Read and construct tables.
-    let d1 = stream.read_u32()?;
-    let d2 = stream.read_u32()?;
+    let d1 = stream.next_u32()?;
+    let d2 = stream.next_u32()?;
     stream.skip(4 * d1)?;
     stream.read_exact(&mut forward_table)?;
     stream.skip(4 * d2)?;
@@ -28,7 +26,7 @@ fn decrypt_gm8xx<T: Read>(mut stream: T) -> io::Result<Cursor<Vec<u8>>> {
     }
 
     // Read data into memory.
-    let len = stream.read_u32()? as usize;
+    let len = stream.next_u32()? as usize;
     let mut buf = Vec::with_capacity(len);
     stream.take(len as u64).read_to_end(&mut buf)?;
 
@@ -58,17 +56,17 @@ fn decrypt_gm8xx<T: Read>(mut stream: T) -> io::Result<Cursor<Vec<u8>>> {
 
 fn decrypt_gm810<T: Read + Seek>(stream: &mut T) -> io::Result<Cursor<Vec<u8>>> {
     // Generate seeds
-    let key = format!("_MJD{}#RWK", stream.read_u32()?);
+    let key = format!("_MJD{}#RWK", stream.next_u32()?);
     let mut key_buffer = Vec::new();
     for b in key.bytes() {
         key_buffer.push(b);
         key_buffer.push(0);
     }
     let mut seed2: u32 = crc::crc32::checksum_ieee(&key_buffer) ^ 0xFFFFFFFF;
-    let mut seed1: u32 = stream.read_u32()?;
+    let mut seed1: u32 = stream.next_u32()?;
 
     // Read version
-    let mut version = stream.read_u32()?;
+    let mut version = stream.next_u32()?;
     let mut pos = stream.seek(SeekFrom::Current(0))? as u32;
     pos -= 4 + 0x0039FBC4 + 0x11;
     if pos == 0 {
@@ -86,14 +84,16 @@ fn decrypt_gm810<T: Read + Seek>(stream: &mut T) -> io::Result<Cursor<Vec<u8>>> 
     println!("pos: {}", pos);
     while pos <= buf.len() - 4 {
         let chunk = &mut buf[pos..(pos + 4)];
+        let mut input = [0u8; 4];
+        input.copy_from_slice(chunk);
         pos += 4;
 
-        let input = byteorder::LittleEndian::read_u32(chunk);
+        let input = u32::from_le_bytes(input);
         seed1 = (0xFFFF & seed1) * 0x9069 + (seed1 >> 16);
         seed2 = (0xFFFF & seed2) * 0x4650 + (seed2 >> 16);
         let mask = (seed1 << 16) + (seed2 & 0xFFFF);
-        let output = input ^ mask;
-        byteorder::LittleEndian::write_u32(chunk, output);
+        let output: u32 = input ^ mask;
+        chunk.copy_from_slice(&output.to_le_bytes());
     }
 
     Ok(Cursor::new(buf))
@@ -130,15 +130,15 @@ fn decrypt_gm530<T: Read + Seek>(stream: &mut T, key: u32) -> io::Result<Cursor<
 fn detect_gm800<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
     stream.seek(SeekFrom::Start(2000000))?;
 
-    Ok(stream.read_u32()? == 1234321)
+    Ok(stream.next_u32()? == 1234321)
 }
 
 fn detect_gm810<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
     stream.seek(SeekFrom::Start(0x0039FBC4))?;
 
     for _ in 0..1024 {
-        if stream.read_u32()? & 0xFF00FF00 == 0xF7000000 {
-            if stream.read_u32()? & 0x00FF00FF == 0x00140067 {
+        if stream.next_u32()? & 0xFF00FF00 == 0xF7000000 {
+            if stream.next_u32()? & 0x00FF00FF == 0x00140067 {
                 return Ok(true);
             }
         }
@@ -153,7 +153,7 @@ fn detect_gm6xx<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
 
     for offset in &start_offsets {
         stream.seek(SeekFrom::Start(*offset))?;
-        if stream.read_u32()? == 1234321 && stream.read_u32()? == 600 {
+        if stream.next_u32()? == 1234321 && stream.next_u32()? == 600 {
             return Ok(true);
         }
     }
@@ -162,7 +162,7 @@ fn detect_gm6xx<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
 
 fn detect_gm530<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
     stream.seek(SeekFrom::Start(1500000))?;
-    let magic = stream.read_u32()?;
+    let magic = stream.next_u32()?;
     if magic != 1230500 {
         return Ok(false);
     }
@@ -173,27 +173,27 @@ fn detect_gm530<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
 fn detect_gm700<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
     stream.seek(SeekFrom::Start(1980000))?;
 
-    Ok(stream.read_u32()? == 1234321)
+    Ok(stream.next_u32()? == 1234321)
 }
 
 fn parse_exe<T: Read + Seek>(project: &mut Project, mut stream: T) -> io::Result<()> {
     println!("Reading header...");
     if let Version::Gm810 = project.version {
-        stream.read_u32()?;
+        stream.next_u32()?;
     }
-    let _version = stream.read_u32()?;
-    let _debug = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let _debug = stream.next_u32()?;
 
     println!("Reading settings...");
-    let _version = stream.read_u32()?;
+    let _version = stream.next_u32()?;
     assert_eq!(_version, 800);
     let compressed = stream.read_compressed()?;
     drain(compressed)?;
 
     // Skip d3dx8.dll (name and then content).
-    let len = stream.read_u32()?;
+    let len = stream.next_u32()?;
     stream.skip(len)?;
-    let len = stream.read_u32()?;
+    let len = stream.next_u32()?;
     stream.skip(len)?;
 
     // Do the main "decryption".
@@ -201,22 +201,22 @@ fn parse_exe<T: Read + Seek>(project: &mut Project, mut stream: T) -> io::Result
     let mut stream = decrypt_gm8xx(stream)?;
 
     // Skip junk
-    let len = stream.read_u32()?;
+    let len = stream.next_u32()?;
     stream.skip(len * 4)?;
 
-    let _pro = stream.read_bool()?;
-    let _game_id = stream.read_u32()?;
+    let _pro = stream.next_bool()?;
+    let _game_id = stream.next_u32()?;
     stream.skip(16)?;
 
     println!("Reading extensions...");
-    let _version = stream.read_u32()?;
-    let num_extensions = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_extensions = stream.next_u32()?;
     for _ in 0..num_extensions {
         stream.skip(4)?;
-        println!("Extension Name: {}", stream.read_string()?);
+        println!("Extension Name: {}", stream.next_string()?);
         stream.skip_section()?;
 
-        let count = stream.read_u32()?;
+        let count = stream.next_u32()?;
         for _ in 0..count {
             stream.skip(4)?;
             stream.skip_section()?;
@@ -225,7 +225,7 @@ fn parse_exe<T: Read + Seek>(project: &mut Project, mut stream: T) -> io::Result
             stream.skip_section()?;
 
             // Args?
-            let count = stream.read_u32()?;
+            let count = stream.next_u32()?;
             for _ in 0..count {
                 stream.skip(4)?;
                 stream.skip_section()?;
@@ -236,7 +236,7 @@ fn parse_exe<T: Read + Seek>(project: &mut Project, mut stream: T) -> io::Result
             }
 
             // Constants
-            let count = stream.read_u32()?;
+            let count = stream.next_u32()?;
             for _ in 0..count {
                 stream.skip(4)?;
                 stream.skip_section()?;
@@ -249,92 +249,92 @@ fn parse_exe<T: Read + Seek>(project: &mut Project, mut stream: T) -> io::Result
     }
 
     println!("Reading triggers...");
-    let _version = stream.read_u32()?;
-    let num_triggers = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_triggers = stream.next_u32()?;
     for _ in 0..num_triggers {
         stream.skip_section()?;
         // TODO read triggers
     }
 
     println!("Reading constants...");
-    let _version = stream.read_u32()?;
-    let num_constants = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_constants = stream.next_u32()?;
     for _ in 0..num_constants {
-        let name = stream.read_string()?;
-        let value = stream.read_string()?;
+        let name = stream.next_string()?;
+        let value = stream.next_string()?;
         println!("Constant: {}: {}", name, value);
     }
 
     println!("Reading sounds...");
-    let _version = stream.read_u32()?;
-    let num_sounds = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_sounds = stream.next_u32()?;
     for _ in 0..num_sounds {
         stream.skip_section()?;
     }
 
     println!("Reading sprites...");
-    let _version = stream.read_u32()?;
-    let num_sprites = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_sprites = stream.next_u32()?;
     for _ in 0..num_sprites {
         let mut section = stream.read_compressed()?;
-        if section.read_bool()? {
-            let name = section.read_string()?;
+        if section.next_bool()? {
+            let name = section.next_string()?;
             println!("Sprite name: {}", name);
         }
         drain(section)?;
     }
 
     println!("Reading backgrounds...");
-    let _version = stream.read_u32()?;
-    let num_backgrounds = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_backgrounds = stream.next_u32()?;
     for _ in 0..num_backgrounds {
         let mut section = stream.read_compressed()?;
-        if section.read_bool()? {
-            let name = section.read_string()?;
+        if section.next_bool()? {
+            let name = section.next_string()?;
             println!("Background name: {}", name);
         }
         drain(section)?;
     }
 
     println!("Reading paths...");
-    let _version = stream.read_u32()?;
-    let num_paths = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_paths = stream.next_u32()?;
     for _ in 0..num_paths {
         let mut section = stream.read_compressed()?;
-        if section.read_bool()? {
-            let name = section.read_string()?;
+        if section.next_bool()? {
+            let name = section.next_string()?;
             println!("Path name: {}", name);
         }
         drain(section)?;
     }
 
     println!("Reading scripts...");
-    let _version = stream.read_u32()?;
-    let num_scripts = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_scripts = stream.next_u32()?;
     for _ in 0..num_scripts {
         let mut section = stream.read_compressed()?;
-        if section.read_bool()? {
-            let name = section.read_string()?;
+        if section.next_bool()? {
+            let name = section.next_string()?;
             println!("Script name: {}", name);
         }
         drain(section)?;
     }
 
     println!("Reading fonts...");
-    let _version = stream.read_u32()?;
-    let num_fonts = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_fonts = stream.next_u32()?;
     for _ in 0..num_fonts {
         let mut section = stream.read_compressed()?;
-        if section.read_bool()? {
-            let name = section.read_string()?;
-            let _version = section.read_u32()?;
-            let font_name = section.read_string()?;
+        if section.next_bool()? {
+            let name = section.next_string()?;
+            let _version = section.next_u32()?;
+            let font_name = section.next_string()?;
             println!("Font name: {} : {}", name, font_name);
-            let size = section.read_u32()?;
-            let bold = section.read_u32()?;
-            let italic = section.read_u32()?;
-            let mut range_start = section.read_u32()?;
-            let range_end = section.read_u32()?;
+            let size = section.next_u32()?;
+            let bold = section.next_u32()?;
+            let italic = section.next_u32()?;
+            let mut range_start = section.next_u32()?;
+            let range_end = section.next_u32()?;
 
             if let Version::Gm810 = project.version {
                 let _charset = range_start & 0xFF000000;
@@ -351,77 +351,77 @@ fn parse_exe<T: Read + Seek>(project: &mut Project, mut stream: T) -> io::Result
     }
 
     println!("Reading timelines...");
-    let _version = stream.read_u32()?;
-    let num_timelines = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_timelines = stream.next_u32()?;
     for _ in 0..num_timelines {
         let mut section = stream.read_compressed()?;
-        if section.read_bool()? {
-            let name = section.read_string()?;
+        if section.next_bool()? {
+            let name = section.next_string()?;
             println!("Timeline name: {}", name);
         }
         drain(section)?;
     }
 
     println!("Reading objects...");
-    let _version = stream.read_u32()?;
-    let num_objects = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_objects = stream.next_u32()?;
     for _ in 0..num_objects {
         let mut section = stream.read_compressed()?;
-        if section.read_bool()? {
-            let name = section.read_string()?;
+        if section.next_bool()? {
+            let name = section.next_string()?;
             println!("Object name: {}", name);
         }
         drain(section)?;
     }
 
     println!("Reading rooms...");
-    let _version = stream.read_u32()?;
-    let num_rooms = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_rooms = stream.next_u32()?;
     for _ in 0..num_rooms {
         let mut section = stream.read_compressed()?;
-        if section.read_bool()? {
-            let name = section.read_string()?;
+        if section.next_bool()? {
+            let name = section.next_string()?;
             println!("Room name: {}", name);
         }
         drain(section)?;
     }
 
-    let _last_object_id = stream.read_u32()?;
-    let _last_tile_id = stream.read_u32()?;
+    let _last_object_id = stream.next_u32()?;
+    let _last_tile_id = stream.next_u32()?;
     println!(
         "Last object: {}, last tile: {}",
         _last_object_id, _last_tile_id
     );
 
     println!("Reading includes...");
-    let _version = stream.read_u32()?;
-    let num_includes = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_includes = stream.next_u32()?;
     for _ in 0..num_includes {
         let mut section = stream.read_compressed()?;
-        if section.read_bool()? {
-            let name = section.read_string()?;
+        if section.next_bool()? {
+            let name = section.next_string()?;
             println!("Include name: {}", name);
         }
         drain(section)?;
     }
 
     println!("Reading help...");
-    let _version = stream.read_u32()?;
+    let _version = stream.next_u32()?;
     stream.skip_section()?;
 
     println!("Reading library init code...");
-    let _version = stream.read_u32()?;
-    let num_inits = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_inits = stream.next_u32()?;
     for _ in 0..num_inits {
         // println!("Library init: {}", stream.read_string()?);
         stream.skip_section()?;
     }
 
     println!("Reading room order...");
-    let _version = stream.read_u32()?;
-    let num_rooms = stream.read_u32()?;
+    let _version = stream.next_u32()?;
+    let num_rooms = stream.next_u32()?;
     for _ in 0..num_rooms {
-        let _order = stream.read_u32()?;
+        let _order = stream.next_u32()?;
         // println!("room {}", _order);
     }
 
@@ -443,10 +443,10 @@ pub fn decode<T: Read + Seek>(mut stream: T) -> io::Result<Project> {
         println!("Detected GM 5.3A Exe");
         project.version = Version::Gm530;
 
-        let key = stream.read_u32()?;
+        let key = stream.next_u32()?;
         let mut stream = decrypt_gm530(&mut stream, key)?;
 
-        let _ = stream.read_u32()?;
+        let _ = stream.next_u32()?;
         stream.skip_section()?;
 
         // At this point, stream contains a V 5.3a GMD.
