@@ -182,7 +182,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         stream.next_u32()?;
     }
     let _version = stream.next_u32()?;
-    let _debug = stream.next_u32()?;
+    game.debug = stream.next_bool()?;
 
     println!("Reading settings...");
     let _version = stream.next_u32()?;
@@ -204,9 +204,11 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     let len = stream.next_u32()?;
     stream.skip(len * 4)?;
 
-    let _pro = stream.next_bool()?;
-    let _game_id = stream.next_u32()?;
-    stream.skip(16)?;
+    game.pro = stream.next_bool()?;
+    game.game_id = stream.next_u32()?;
+    for i in 0..4 {
+        game.guid[i] = stream.next_u32()?;
+    }
 
     println!("Reading extensions...");
     let _version = stream.next_u32()?;
@@ -435,13 +437,12 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
 }
 
 pub fn decode<T: Read + Seek>(mut stream: T) -> io::Result<Game> {
-    let mut game = Game {
-        version: Version::Unknown,
-    };
+    let mut project = Game::default();
+    project.version = Version::Unknown;
 
     if detect_gm530(&mut stream)? {
         println!("Detected GM 5.3A Exe");
-        game.version = Version::Gm530;
+        project.version = Version::Gm530;
 
         let key = stream.next_u32()?;
         let mut stream = decrypt_gm530(&mut stream, key)?;
@@ -452,22 +453,22 @@ pub fn decode<T: Read + Seek>(mut stream: T) -> io::Result<Game> {
         // At this point, stream contains a V 5.3a GMD.
     } else if detect_gm6xx(&mut stream)? {
         println!("Detected GM 6.0/6.1 Exe");
-        game.version = Version::Gm600;
+        project.version = Version::Gm600;
     } else if detect_gm700(&mut stream)? {
         println!("Detected GM 7.0 Exe");
-        game.version = Version::Gm700;
+        project.version = Version::Gm700;
     } else if detect_gm800(&mut stream)? {
         println!("Detected GM 8.0 Exe");
-        game.version = Version::Gm800;
-        parse_exe(&mut game, &mut stream)?;
+        project.version = Version::Gm800;
+        parse_exe(&mut project, &mut stream)?;
     } else if detect_gm810(&mut stream)? {
         println!("Detected GM 8.1 Exe");
-        game.version = Version::Gm810;
+        project.version = Version::Gm810;
         let mut stream = decrypt_gm810(&mut stream)?;
-        parse_exe(&mut game, &mut stream)?;
+        parse_exe(&mut project, &mut stream)?;
     } else {
         println!("Unknown file");
     }
 
-    Ok(game)
+    Ok(project)
 }
