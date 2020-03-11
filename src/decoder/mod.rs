@@ -3,12 +3,17 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sprite, SpriteFrame, SpriteMask};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
 fn drain<T: Read>(mut s: T) -> io::Result<u64> {
     io::copy(&mut s, &mut io::sink())
+}
+
+fn assert_eof<T: Read>(s: T) {
+    let bytes_remaining = drain(s).unwrap();
+    assert_eq!(bytes_remaining, 0)
 }
 
 fn decrypt_gm8xx<T: Read>(mut stream: T) -> io::Result<Cursor<Vec<u8>>> {
@@ -270,8 +275,29 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading sounds...");
     let _version = stream.next_u32()?;
     let num_sounds = stream.next_u32()?;
-    for _ in 0..num_sounds {
-        stream.skip_section()?;
+    game.sounds.reserve(num_sounds as usize);
+    for i in 0..num_sounds {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
+        }
+
+        let mut sound = Sound::default();
+        sound.id = i;
+        sound.name = stream.next_string()?;
+        let _version = stream.next_u32()?;
+        sound.kind = stream.next_u32()?;
+        sound.filetype = stream.next_string()?;
+        sound.filename = stream.next_string()?;
+        if stream.next_bool()? {
+            sound.data = stream.next_section()?;
+        }
+        sound.effects = stream.next_u32()?;
+        sound.volume = stream.next_f64()?;
+        sound.pan = stream.next_f64()?;
+        sound.preload = stream.next_bool()?;
+        game.sounds.push(sound);
+        assert_eof(stream);
     }
 
     println!("Reading sprites...");
@@ -320,7 +346,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         }
 
         game.sprites.push(sprite);
-        drain(stream)?;
+        assert_eof(stream);
     }
 
     println!("Reading backgrounds...");

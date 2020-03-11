@@ -23,9 +23,24 @@ pub struct Game {
     pub guid: [u32; 4],
 
     pub sprites: Vec<Sprite>,
+    pub sounds: Vec<Sound>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
+pub struct Sound {
+    pub id: u32,
+    pub name: String,
+    pub kind: u32,
+    pub filetype: String,
+    pub filename: String,
+    pub data: Vec<u8>,
+    pub effects: u32,
+    pub volume: f64,
+    pub pan: f64,
+    pub preload: bool,
+}
+
+#[derive(Default, Debug)]
 pub struct Sprite {
     pub id: u32,
     pub name: String,
@@ -35,13 +50,13 @@ pub struct Sprite {
     pub masks: Vec<SpriteMask>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct SpriteFrame {
     pub size: (u32, u32),
     pub data: Vec<u8>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct SpriteMask {
     pub size: (u32, u32),
     pub left: i32,
