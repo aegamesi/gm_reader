@@ -3,7 +3,7 @@ use std::io::BufReader;
 use std::{env, process};
 
 mod decoder;
-mod project;
+mod game;
 
 struct Config {
     filename: String,

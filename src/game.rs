@@ -8,6 +8,6 @@ pub enum Version {
     Gm810 = 810,
 }
 
-pub struct Project {
+pub struct Game {
     pub version: Version,
 }
