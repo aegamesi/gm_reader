@@ -21,4 +21,32 @@ pub struct Game {
     pub pro: bool,
     pub game_id: u32,
     pub guid: [u32; 4],
+
+    pub sprites: Vec<Sprite>,
+}
+
+#[derive(Default)]
+pub struct Sprite {
+    pub id: u32,
+    pub name: String,
+    pub origin: (i32, i32),
+
+    pub frames: Vec<SpriteFrame>,
+    pub masks: Vec<SpriteMask>,
+}
+
+#[derive(Default)]
+pub struct SpriteFrame {
+    pub size: (u32, u32),
+    pub data: Vec<u8>,
+}
+
+#[derive(Default)]
+pub struct SpriteMask {
+    pub size: (u32, u32),
+    pub left: i32,
+    pub right: i32,
+    pub bottom: i32,
+    pub top: i32,
+    pub data: Vec<bool>,
 }

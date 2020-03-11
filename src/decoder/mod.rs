@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version};
+use crate::game::{Game, Version, Sprite, SpriteFrame, SpriteMask};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -187,7 +187,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading settings...");
     let _version = stream.next_u32()?;
     assert_eq!(_version, 800);
-    let compressed = stream.read_compressed()?;
+    let compressed = stream.next_compressed()?;
     drain(compressed)?;
 
     // Skip d3dx8.dll (name and then content).
@@ -277,20 +277,57 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading sprites...");
     let _version = stream.next_u32()?;
     let num_sprites = stream.next_u32()?;
-    for _ in 0..num_sprites {
-        let mut section = stream.read_compressed()?;
-        if section.next_bool()? {
-            let name = section.next_string()?;
-            println!("Sprite name: {}", name);
+    game.sprites.reserve(num_sprites as usize);
+    for i in 0..num_sprites {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
         }
-        drain(section)?;
+
+        let mut sprite = Sprite::default();
+        sprite.id = i;
+        sprite.name = stream.next_string()?;
+        let _version = stream.next_u32()?;
+        sprite.origin = (stream.next_i32()?, stream.next_i32()?);
+
+        let num_frames = stream.next_u32()? as usize;
+        sprite.frames.reserve(num_frames);
+        for _ in 0..num_frames {
+            let mut frame = SpriteFrame::default();
+            let _version = stream.next_u32()?;
+            frame.size = (stream.next_u32()?, stream.next_u32()?);
+            frame.data = stream.next_section()?;
+            sprite.frames.push(frame);
+        }
+
+        let has_separate_masks = stream.next_bool()?;
+        let num_masks = if has_separate_masks { num_frames } else { 1 };
+        sprite.masks.reserve(num_masks);
+        for _ in 0..num_masks {
+            let mut mask = SpriteMask::default();
+            let _version = stream.next_u32()?;
+            mask.size = (stream.next_u32()?, stream.next_u32()?);
+            mask.left = stream.next_i32()?;
+            mask.right = stream.next_i32()?;
+            mask.bottom = stream.next_i32()?;
+            mask.top = stream.next_i32()?;
+            let data_length = (mask.size.0 * mask.size.1) as usize;
+            mask.data.reserve(data_length);
+            for _ in 0..data_length {
+                mask.data.push(stream.next_bool()?);
+            }
+            sprite.masks.push(mask);
+        }
+
+        game.sprites.push(sprite);
+        drain(stream)?;
     }
 
     println!("Reading backgrounds...");
     let _version = stream.next_u32()?;
     let num_backgrounds = stream.next_u32()?;
     for _ in 0..num_backgrounds {
-        let mut section = stream.read_compressed()?;
+        let mut section = stream.next_compressed()?;
         if section.next_bool()? {
             let name = section.next_string()?;
             println!("Background name: {}", name);
@@ -302,7 +339,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     let _version = stream.next_u32()?;
     let num_paths = stream.next_u32()?;
     for _ in 0..num_paths {
-        let mut section = stream.read_compressed()?;
+        let mut section = stream.next_compressed()?;
         if section.next_bool()? {
             let name = section.next_string()?;
             println!("Path name: {}", name);
@@ -314,7 +351,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     let _version = stream.next_u32()?;
     let num_scripts = stream.next_u32()?;
     for _ in 0..num_scripts {
-        let mut section = stream.read_compressed()?;
+        let mut section = stream.next_compressed()?;
         if section.next_bool()? {
             let name = section.next_string()?;
             println!("Script name: {}", name);
@@ -326,7 +363,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     let _version = stream.next_u32()?;
     let num_fonts = stream.next_u32()?;
     for _ in 0..num_fonts {
-        let mut section = stream.read_compressed()?;
+        let mut section = stream.next_compressed()?;
         if section.next_bool()? {
             let name = section.next_string()?;
             let _version = section.next_u32()?;
@@ -356,7 +393,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     let _version = stream.next_u32()?;
     let num_timelines = stream.next_u32()?;
     for _ in 0..num_timelines {
-        let mut section = stream.read_compressed()?;
+        let mut section = stream.next_compressed()?;
         if section.next_bool()? {
             let name = section.next_string()?;
             println!("Timeline name: {}", name);
@@ -368,7 +405,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     let _version = stream.next_u32()?;
     let num_objects = stream.next_u32()?;
     for _ in 0..num_objects {
-        let mut section = stream.read_compressed()?;
+        let mut section = stream.next_compressed()?;
         if section.next_bool()? {
             let name = section.next_string()?;
             println!("Object name: {}", name);
@@ -380,7 +417,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     let _version = stream.next_u32()?;
     let num_rooms = stream.next_u32()?;
     for _ in 0..num_rooms {
-        let mut section = stream.read_compressed()?;
+        let mut section = stream.next_compressed()?;
         if section.next_bool()? {
             let name = section.next_string()?;
             println!("Room name: {}", name);
@@ -399,7 +436,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     let _version = stream.next_u32()?;
     let num_includes = stream.next_u32()?;
     for _ in 0..num_includes {
-        let mut section = stream.read_compressed()?;
+        let mut section = stream.next_compressed()?;
         if section.next_bool()? {
             let name = section.next_string()?;
             println!("Include name: {}", name);
