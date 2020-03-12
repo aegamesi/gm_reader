@@ -24,6 +24,7 @@ pub struct Game {
 
     pub sprites: Vec<Sprite>,
     pub sounds: Vec<Sound>,
+    pub backgrounds: Vec<Background>,
 }
 
 #[derive(Default, Debug)]
@@ -64,4 +65,12 @@ pub struct SpriteMask {
     pub bottom: i32,
     pub top: i32,
     pub data: Vec<bool>,
+}
+
+#[derive(Default, Debug)]
+pub struct Background {
+    pub id: u32,
+    pub name: String,
+    pub size: (u32, u32),
+    pub data: Vec<u8>,
 }

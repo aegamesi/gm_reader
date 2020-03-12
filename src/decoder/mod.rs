@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -352,13 +352,24 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading backgrounds...");
     let _version = stream.next_u32()?;
     let num_backgrounds = stream.next_u32()?;
-    for _ in 0..num_backgrounds {
-        let mut section = stream.next_compressed()?;
-        if section.next_bool()? {
-            let name = section.next_string()?;
-            println!("Background name: {}", name);
+    game.backgrounds.reserve(num_backgrounds as usize);
+    for i in 0..num_backgrounds {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
         }
-        drain(section)?;
+
+        let mut background = Background::default();
+        background.id = i;
+        background.name = stream.next_string()?;
+        let _version = stream.next_u32()?;
+        let _version = stream.next_u32()?;
+        background.size = (stream.next_u32()?, stream.next_u32()?);
+        if background.size.0 > 0 && background.size.1 > 0 {
+            background.data = stream.next_section()?;
+        }
+        game.backgrounds.push(background);
+        assert_eof(stream);
     }
 
     println!("Reading paths...");
