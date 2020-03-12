@@ -26,6 +26,7 @@ pub struct Game {
     pub sounds: Vec<Sound>,
     pub backgrounds: Vec<Background>,
     pub paths: Vec<Path>,
+    pub scripts: Vec<Script>,
 }
 
 #[derive(Default, Debug)]
@@ -91,4 +92,11 @@ pub struct PathPoint {
     pub x: f64,
     pub y: f64,
     pub speed: f64,
+}
+
+#[derive(Default, Debug)]
+pub struct Script {
+    pub id: u32,
+    pub name: String,
+    pub script: String,
 }

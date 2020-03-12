@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -405,13 +405,20 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading scripts...");
     let _version = stream.next_u32()?;
     let num_scripts = stream.next_u32()?;
-    for _ in 0..num_scripts {
-        let mut section = stream.next_compressed()?;
-        if section.next_bool()? {
-            let name = section.next_string()?;
-            println!("Script name: {}", name);
+    game.scripts.reserve(num_scripts as usize);
+    for i in 0..num_scripts {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
         }
-        drain(section)?;
+
+        let mut script = Script::default();
+        script.id = i;
+        script.name = stream.next_string()?;
+        let _version = stream.next_u32()?;
+        script.script = stream.next_string()?;
+        game.scripts.push(script);
+        assert_eof(stream);
     }
 
     println!("Reading fonts...");
