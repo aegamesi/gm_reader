@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -424,31 +424,42 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading fonts...");
     let _version = stream.next_u32()?;
     let num_fonts = stream.next_u32()?;
-    for _ in 0..num_fonts {
-        let mut section = stream.next_compressed()?;
-        if section.next_bool()? {
-            let name = section.next_string()?;
-            let _version = section.next_u32()?;
-            let font_name = section.next_string()?;
-            println!("Font name: {} : {}", name, font_name);
-            let size = section.next_u32()?;
-            let bold = section.next_u32()?;
-            let italic = section.next_u32()?;
-            let mut range_start = section.next_u32()?;
-            let range_end = section.next_u32()?;
-
-            if let Version::Gm810 = game.version {
-                let _charset = range_start & 0xFF000000;
-                let _aa_level = range_start & 0x00FF0000;
-                range_start &= 0x0000FFFF;
-            }
-
-            println!(
-                "Size {}, Bold {}, Italic {}, Start {}, End {}",
-                size, bold, italic, range_start, range_end
-            );
+    game.fonts.reserve(num_fonts as usize);
+    for i in 0..num_fonts {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
         }
-        drain(section)?;
+
+        let mut font = Font::default();
+        font.id = i;
+        font.name = stream.next_string()?;
+        let _version = stream.next_u32()?;
+        font.font_name = stream.next_string()?;
+        font.size = stream.next_u32()?;
+        font.bold = stream.next_bool()?;
+        font.italic = stream.next_bool()?;
+        font.range_start = stream.next_u32()?;
+        font.range_end = stream.next_u32()?;
+
+        if let Version::Gm810 = game.version {
+            font.charset = (font.range_start & 0xFF000000) >> 24;
+            font.aa_level = (font.range_start & 0x00FF0000) >> 16;
+            font.range_start = font.range_start & 0x0000FFFF;
+        }
+
+        for i in 0..256 {
+            let glyph = &mut font.atlas.glyphs[i];
+            glyph.pos = (stream.next_u32()?, stream.next_u32()?);
+            glyph.size = (stream.next_u32()?, stream.next_u32()?);
+            glyph.horizontal_advance = stream.next_i32()?;
+            glyph.kerning = stream.next_i32()?;
+        }
+        font.atlas.size = (stream.next_u32()?, stream.next_u32()?);
+        font.atlas.data = stream.next_section()?;
+
+        game.fonts.push(font);
+        assert_eof(stream);
     }
 
     println!("Reading timelines...");

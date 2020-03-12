@@ -27,6 +27,7 @@ pub struct Game {
     pub backgrounds: Vec<Background>,
     pub paths: Vec<Path>,
     pub scripts: Vec<Script>,
+    pub fonts: Vec<Font>,
 }
 
 #[derive(Default, Debug)]
@@ -99,4 +100,43 @@ pub struct Script {
     pub id: u32,
     pub name: String,
     pub script: String,
+}
+
+#[derive(Default)]
+pub struct Font {
+    pub id: u32,
+    pub name: String,
+    pub font_name: String,
+    pub size: u32,
+    pub bold: bool,
+    pub italic: bool,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub charset: u32,
+    pub aa_level: u32,
+    pub atlas: FontAtlas,
+}
+
+pub struct FontAtlas {
+    pub glyphs: [FontAtlasGlyph; 256],
+    pub size: (u32, u32),
+    pub data: Vec<u8>,
+}
+
+impl Default for FontAtlas {
+    fn default() -> Self {
+        FontAtlas {
+            glyphs: [FontAtlasGlyph::default(); 256],
+            size: (0, 0),
+            data: vec![],
+        }
+    }
+}
+
+#[derive(Default, Copy, Clone, Debug)]
+pub struct FontAtlasGlyph {
+    pub pos: (u32, u32),
+    pub size: (u32, u32),
+    pub horizontal_advance: i32,
+    pub kerning: i32,
 }
