@@ -25,6 +25,7 @@ pub struct Game {
     pub sprites: Vec<Sprite>,
     pub sounds: Vec<Sound>,
     pub backgrounds: Vec<Background>,
+    pub paths: Vec<Path>,
 }
 
 #[derive(Default, Debug)]
@@ -73,4 +74,21 @@ pub struct Background {
     pub name: String,
     pub size: (u32, u32),
     pub data: Vec<u8>,
+}
+
+#[derive(Default, Debug)]
+pub struct Path {
+    pub id: u32,
+    pub name: String,
+    pub connection_type: u32,
+    pub closed: bool,
+    pub precision: u32,
+    pub points: Vec<PathPoint>,
+}
+
+#[derive(Default, Debug)]
+pub struct PathPoint {
+    pub x: f64,
+    pub y: f64,
+    pub speed: f64,
 }

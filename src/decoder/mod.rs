@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -375,13 +375,31 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading paths...");
     let _version = stream.next_u32()?;
     let num_paths = stream.next_u32()?;
-    for _ in 0..num_paths {
-        let mut section = stream.next_compressed()?;
-        if section.next_bool()? {
-            let name = section.next_string()?;
-            println!("Path name: {}", name);
+    game.paths.reserve(num_paths as usize);
+    for i in 0..num_paths {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
         }
-        drain(section)?;
+
+        let mut path = Path::default();
+        path.id = i;
+        path.name = stream.next_string()?;
+        let _version = stream.next_u32()?;
+        path.connection_type = stream.next_u32()?;
+        path.closed = stream.next_bool()?;
+        path.precision = stream.next_u32()?;
+        let num_points = stream.next_u32()? as usize;
+        path.points.reserve(num_points);
+        for _ in 0..num_points {
+            let mut point = PathPoint::default();
+            point.x = stream.next_f64()?;
+            point.y = stream.next_f64()?;
+            point.speed = stream.next_f64()?;
+            path.points.push(point);
+        }
+        game.paths.push(path);
+        assert_eof(stream);
     }
 
     println!("Reading scripts...");
