@@ -28,6 +28,7 @@ pub struct Game {
     pub paths: Vec<Path>,
     pub scripts: Vec<Script>,
     pub fonts: Vec<Font>,
+    pub timelines: Vec<Timeline>,
 }
 
 #[derive(Default, Debug)]
@@ -139,4 +140,36 @@ pub struct FontAtlasGlyph {
     pub size: (u32, u32),
     pub horizontal_advance: i32,
     pub kerning: i32,
+}
+
+#[derive(Default, Debug)]
+pub struct Action {
+    pub library_id: u32,
+    pub action_id: u32,
+    pub action_kind: u32,
+    pub has_relative: bool,
+    pub is_question: bool,
+    pub has_target: bool,
+    pub action_type: u32,
+    pub name: String,
+    pub code: String,
+    pub parameters_used: u32,
+    pub parameters: Vec<u32>,
+    pub target: i32,
+    pub relative: bool,
+    pub arguments: Vec<String>,
+    pub negate: bool,
+}
+
+#[derive(Default, Debug)]
+pub struct Timeline {
+    pub id: u32,
+    pub name: String,
+    pub moments: Vec<TimelineMoment>,
+}
+
+#[derive(Default, Debug)]
+pub struct TimelineMoment {
+    pub position: u32,
+    pub actions: Vec<Action>,
 }

@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -179,6 +179,50 @@ fn detect_gm700<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
     stream.seek(SeekFrom::Start(1980000))?;
 
     Ok(stream.next_u32()? == 1234321)
+}
+
+fn read_action<T: Read>(stream: &mut T) -> io::Result<Action> {
+    let mut action = Action::default();
+    let _version = stream.next_u32()?;
+    action.library_id = stream.next_u32()?;
+    action.action_id = stream.next_u32()?;
+    action.action_kind = stream.next_u32()?;
+    action.has_relative = stream.next_bool()?;
+    action.is_question = stream.next_bool()?;
+    action.has_target = stream.next_bool()?;
+    action.action_type = stream.next_u32()?;
+    action.name = stream.next_string()?;
+    action.code = stream.next_string()?;
+    action.parameters_used = stream.next_u32()?;
+
+    let num_parameters = stream.next_u32()?;
+    action.parameters.reserve(num_parameters as usize);
+    for _ in 0..num_parameters as usize {
+        action.parameters.push(stream.next_u32()?);
+    }
+
+    action.target = stream.next_i32()?;
+    action.relative = stream.next_bool()?;
+
+    let num_arguments = stream.next_u32()?;
+    action.arguments.reserve(num_arguments as usize);
+    for _ in 0..num_arguments as usize {
+        action.arguments.push(stream.next_string()?);
+    }
+
+    action.negate = stream.next_bool()?;
+
+    Ok(action)
+}
+
+fn read_actions<T: Read>(stream: &mut T) -> io::Result<Vec<Action>> {
+    let mut actions = Vec::new();
+    let _version = stream.next_u32()?;
+    let num_actions = stream.next_u32()?;
+    for _ in 0..num_actions {
+        actions.push(read_action(stream)?);
+    }
+    Ok(actions)
 }
 
 fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
@@ -465,13 +509,27 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading timelines...");
     let _version = stream.next_u32()?;
     let num_timelines = stream.next_u32()?;
-    for _ in 0..num_timelines {
-        let mut section = stream.next_compressed()?;
-        if section.next_bool()? {
-            let name = section.next_string()?;
-            println!("Timeline name: {}", name);
+    game.timelines.reserve(num_timelines as usize);
+    for i in 0..num_timelines {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
         }
-        drain(section)?;
+
+        let mut timeline = Timeline::default();
+        timeline.id = i;
+        timeline.name = stream.next_string()?;
+        let _version = stream.next_u32()?;
+        let num_moments = stream.next_u32()?;
+        timeline.moments.reserve(num_moments as usize);
+        for _ in 0..num_moments {
+            let mut moment = TimelineMoment::default();
+            moment.position = stream.next_u32()?;
+            moment.actions = read_actions(&mut stream)?;
+            timeline.moments.push(moment);
+        }
+        game.timelines.push(timeline);
+        assert_eof(stream);
     }
 
     println!("Reading objects...");
