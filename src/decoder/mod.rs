@@ -361,6 +361,10 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         sprite.origin = (stream.next_i32()?, stream.next_i32()?);
 
         let num_frames = stream.next_u32()? as usize;
+        if num_frames == 0 {
+            continue;
+        }
+
         sprite.frames.reserve(num_frames);
         for _ in 0..num_frames {
             let mut frame = SpriteFrame::default();
