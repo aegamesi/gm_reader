@@ -37,6 +37,7 @@ pub struct Game {
     pub rooms: Vec<Room>,
     pub includes: Vec<Include>,
 
+    pub library_init_scripts: Vec<String>,
     pub room_order: Vec<u32>,
 }
 

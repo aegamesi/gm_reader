@@ -789,12 +789,11 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         assert_eof(stream);
     }
 
-    println!("Reading library init code...");
+    println!("Reading library init scripts...");
     let _version = stream.next_u32()?;
-    let num_inits = stream.next_u32()?;
-    for _ in 0..num_inits {
-        // println!("Library init: {}", stream.read_string()?);
-        stream.skip_section()?;
+    let num_init_scripts = stream.next_u32()?;
+    for _ in 0..num_init_scripts {
+        game.library_init_scripts.push(stream.next_string()?);
     }
 
     println!("Reading room order...");
