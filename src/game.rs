@@ -33,6 +33,7 @@ pub struct Game {
     pub timelines: Vec<Timeline>,
     pub objects: Vec<Object>,
     pub rooms: Vec<Room>,
+    pub includes: Vec<Include>,
 
     pub room_order: Vec<u32>,
 }
@@ -321,4 +322,19 @@ pub struct RoomTile {
     pub height: u32,
     pub depth: i32,
     pub id: i32,
+}
+
+#[derive(Default, Debug)]
+pub struct Include {
+    pub name: String,
+    pub original_path: String,
+    pub original_chosen: bool,
+    pub original_size: u32,
+    pub store_in_editable: bool,
+    pub data: Vec<u8>,
+    pub export: u32,
+    pub export_folder: String,
+    pub overwrite: bool,
+    pub free_memory: bool,
+    pub remove_at_end: bool,
 }

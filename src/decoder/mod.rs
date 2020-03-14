@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile, Include};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -733,13 +733,27 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading includes...");
     let _version = stream.next_u32()?;
     let num_includes = stream.next_u32()?;
+    game.includes.reserve(num_includes as usize);
     for _ in 0..num_includes {
-        let mut section = stream.next_compressed()?;
-        if section.next_bool()? {
-            let name = section.next_string()?;
-            println!("Include name: {}", name);
+        let mut stream = stream.next_compressed()?;
+        let mut include = Include::default();
+        let _version = stream.next_u32()?;
+        include.name = stream.next_string()?;
+        include.original_path = stream.next_string()?;
+        include.original_chosen = stream.next_bool()?;
+        include.original_size = stream.next_u32()?;
+        include.store_in_editable = stream.next_bool()?;
+        if include.original_chosen && include.store_in_editable {
+            include.data = stream.next_section()?;
         }
-        drain(section)?;
+        include.export = stream.next_u32()?;
+        include.export_folder = stream.next_string()?;
+        include.overwrite = stream.next_bool()?;
+        include.free_memory = stream.next_bool()?;
+        include.remove_at_end = stream.next_bool()?;
+
+        game.includes.push(include);
+        assert_eof(stream);
     }
 
     println!("Reading help...");
