@@ -22,6 +22,7 @@ pub struct Game {
     pub game_id: u32,
     pub guid: [u32; 4],
 
+    pub constants: Vec<Constant>,
     pub sprites: Vec<Sprite>,
     pub sounds: Vec<Sound>,
     pub backgrounds: Vec<Background>,
@@ -30,6 +31,12 @@ pub struct Game {
     pub fonts: Vec<Font>,
     pub timelines: Vec<Timeline>,
     pub objects: Vec<Object>,
+}
+
+#[derive(Default, Debug)]
+pub struct Constant {
+    pub name: String,
+    pub value: String,
 }
 
 #[derive(Default, Debug)]

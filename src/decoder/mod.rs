@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -310,10 +310,12 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading constants...");
     let _version = stream.next_u32()?;
     let num_constants = stream.next_u32()?;
+    game.constants.reserve(num_constants as usize);
     for _ in 0..num_constants {
-        let name = stream.next_string()?;
-        let value = stream.next_string()?;
-        println!("Constant: {}: {}", name, value);
+        let mut constant = Constant::default();
+        constant.name = stream.next_string()?;
+        constant.value = stream.next_string()?;
+        game.constants.push(constant);
     }
 
     println!("Reading sounds...");
