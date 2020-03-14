@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile, Include};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile, Include, Trigger};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -355,9 +355,22 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading triggers...");
     let _version = stream.next_u32()?;
     let num_triggers = stream.next_u32()?;
-    for _ in 0..num_triggers {
-        stream.skip_section()?;
-        // TODO read triggers
+    game.triggers.reserve(num_triggers as usize);
+    for i in 0..num_triggers {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
+        }
+
+        let _version = stream.next_u32()?;
+        let mut trigger = Trigger::default();
+        trigger.id = i;
+        trigger.name = stream.next_string()?;
+        trigger.condition = stream.next_string()?;
+        trigger.check_moment = stream.next_u32()?;
+        trigger.constant_name = stream.next_string()?;
+        game.triggers.push(trigger);
+        assert_eof(stream);
     }
 
     println!("Reading constants...");

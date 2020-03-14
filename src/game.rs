@@ -21,8 +21,9 @@ pub struct Game {
     pub pro: bool,
     pub game_id: u32,
     pub guid: [u32; 4],
-    pub settings: Settings,
 
+    pub settings: Settings,
+    pub triggers: Vec<Trigger>,
     pub constants: Vec<Constant>,
     pub sprites: Vec<Sprite>,
     pub sounds: Vec<Sound>,
@@ -80,6 +81,15 @@ pub struct Settings {
     pub error_abort: bool,
     pub uninitialized_zero: bool,
     pub uninitialized_arguments_error: bool,
+}
+
+#[derive(Default, Debug)]
+pub struct Trigger {
+    pub id: u32,
+    pub name: String,
+    pub condition: String,
+    pub check_moment: u32,
+    pub constant_name: String,
 }
 
 #[derive(Default, Debug)]
