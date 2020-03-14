@@ -21,6 +21,7 @@ pub struct Game {
     pub pro: bool,
     pub game_id: u32,
     pub guid: [u32; 4],
+    pub settings: Settings,
 
     pub constants: Vec<Constant>,
     pub sprites: Vec<Sprite>,
@@ -34,6 +35,49 @@ pub struct Game {
     pub rooms: Vec<Room>,
 
     pub room_order: Vec<u32>,
+}
+
+#[derive(Default, Debug)]
+pub struct Settings {
+    pub fullscreen: bool,
+    pub interpolation: bool,
+    pub hide_border: bool,
+    pub show_cursor: bool,
+    pub scaling: i32,
+    pub resizable: bool,
+    pub always_on_top: bool,
+    pub background_color: u32,
+
+    pub set_resolution: bool,
+    pub color_depth: u32,
+    pub resolution: u32,
+    pub frequency: u32,
+    pub hide_buttons: bool,
+    pub vsync: bool,
+    pub disable_screensaver: bool,
+
+    pub default_f4: bool,
+    pub default_f1: bool,
+    pub default_esc: bool,
+    pub default_f5: bool,
+    pub default_f9: bool,
+    pub close_as_esc: bool,
+    pub priority: u32,
+    pub freeze: bool,
+
+    pub loading_bar: u32,
+    pub loading_bar_back: Option<Vec<u8>>,
+    pub loading_bar_front: Option<Vec<u8>>,
+    pub loading_background: Option<Vec<u8>>,
+
+    pub load_transparent: bool,
+    pub load_alpha: u32,
+    pub load_scale: bool,
+
+    pub error_display: bool,
+    pub error_log: bool,
+    pub error_abort: bool,
+    pub uninitialized_zero: bool,
 }
 
 #[derive(Default, Debug)]
