@@ -32,6 +32,8 @@ pub struct Game {
     pub timelines: Vec<Timeline>,
     pub objects: Vec<Object>,
     pub rooms: Vec<Room>,
+
+    pub room_order: Vec<u32>,
 }
 
 #[derive(Default, Debug)]

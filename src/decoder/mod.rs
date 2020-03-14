@@ -706,9 +706,9 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading room order...");
     let _version = stream.next_u32()?;
     let num_rooms = stream.next_u32()?;
+    game.room_order.reserve(num_rooms as usize);
     for _ in 0..num_rooms {
-        let _order = stream.next_u32()?;
-        // println!("room {}", _order);
+        game.room_order.push(stream.next_u32()?);
     }
 
     let remaining = drain(stream)?;
