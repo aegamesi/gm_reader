@@ -772,7 +772,22 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
 
     println!("Reading help...");
     let _version = stream.next_u32()?;
-    stream.skip_section()?;
+    {
+        let mut stream = stream.next_compressed()?;
+        game.help.background_color = stream.next_u32()?;
+        game.help.separate_window = stream.next_bool()?;
+        game.help.caption = stream.next_string()?;
+        game.help.left = stream.next_i32()?;
+        game.help.top = stream.next_i32()?;
+        game.help.width = stream.next_i32()?;
+        game.help.height = stream.next_i32()?;
+        game.help.show_border = stream.next_bool()?;
+        game.help.allow_resize = stream.next_bool()?;
+        game.help.always_on_top = stream.next_bool()?;
+        game.help.freeze_game = stream.next_bool()?;
+        game.help.content = stream.next_string()?;
+        assert_eof(stream);
+    }
 
     println!("Reading library init code...");
     let _version = stream.next_u32()?;

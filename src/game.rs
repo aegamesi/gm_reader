@@ -23,6 +23,7 @@ pub struct Game {
     pub guid: [u32; 4],
 
     pub settings: Settings,
+    pub help: Help,
     pub triggers: Vec<Trigger>,
     pub constants: Vec<Constant>,
     pub sprites: Vec<Sprite>,
@@ -348,4 +349,20 @@ pub struct Include {
     pub overwrite: bool,
     pub free_memory: bool,
     pub remove_at_end: bool,
+}
+
+#[derive(Default, Debug)]
+pub struct Help {
+    pub background_color: u32,
+    pub separate_window: bool,
+    pub caption: String,
+    pub left: i32,
+    pub top: i32,
+    pub width: i32,
+    pub height: i32,
+    pub show_border: bool,
+    pub allow_resize: bool,
+    pub always_on_top: bool,
+    pub freeze_game: bool,
+    pub content: String,
 }
