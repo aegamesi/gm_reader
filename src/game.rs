@@ -172,7 +172,7 @@ pub struct Script {
     pub script: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Font {
     pub id: u32,
     pub name: String,
@@ -187,23 +187,14 @@ pub struct Font {
     pub atlas: FontAtlas,
 }
 
+#[derive(Default, Debug)]
 pub struct FontAtlas {
-    pub glyphs: [FontAtlasGlyph; 256],
+    pub glyphs: Vec<FontAtlasGlyph>,
     pub size: (u32, u32),
     pub data: Vec<u8>,
 }
 
-impl Default for FontAtlas {
-    fn default() -> Self {
-        FontAtlas {
-            glyphs: [FontAtlasGlyph::default(); 256],
-            size: (0, 0),
-            data: vec![],
-        }
-    }
-}
-
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Default, Debug)]
 pub struct FontAtlasGlyph {
     pub pos: (u32, u32),
     pub size: (u32, u32),

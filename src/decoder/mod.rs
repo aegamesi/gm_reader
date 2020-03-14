@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile, Include, Trigger};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile, Include, Trigger, FontAtlasGlyph};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -565,12 +565,15 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
             font.range_start = font.range_start & 0x0000FFFF;
         }
 
-        for i in 0..256 {
-            let glyph = &mut font.atlas.glyphs[i];
+        let num_glyphs = 256;
+        font.atlas.glyphs.reserve(num_glyphs);
+        for _ in 0..num_glyphs {
+            let mut glyph = FontAtlasGlyph::default();
             glyph.pos = (stream.next_u32()?, stream.next_u32()?);
             glyph.size = (stream.next_u32()?, stream.next_u32()?);
             glyph.horizontal_advance = stream.next_i32()?;
             glyph.kerning = stream.next_i32()?;
+            font.atlas.glyphs.push(glyph);
         }
         font.atlas.size = (stream.next_u32()?, stream.next_u32()?);
         font.atlas.data = stream.next_blob()?;
