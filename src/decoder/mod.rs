@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -584,13 +584,92 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading rooms...");
     let _version = stream.next_u32()?;
     let num_rooms = stream.next_u32()?;
-    for _ in 0..num_rooms {
-        let mut section = stream.next_compressed()?;
-        if section.next_bool()? {
-            let name = section.next_string()?;
-            println!("Room name: {}", name);
+    game.rooms.reserve(num_rooms as usize);
+    for i in 0..num_rooms {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
         }
-        drain(section)?;
+
+        let mut room = Room::default();
+        room.id = i;
+        room.name = stream.next_string()?;
+        let _version = stream.next_u32()?;
+
+        room.caption = stream.next_string()?;
+        room.width = stream.next_u32()?;
+        room.height = stream.next_u32()?;
+        room.speed = stream.next_u32()?;
+        room.persistent = stream.next_bool()?;
+        room.clear_color = stream.next_u32()?;
+        room.clear = stream.next_bool()?;
+        room.creation_code = stream.next_string()?;
+
+        let num_backgrounds = stream.next_u32()?;
+        for _ in 0..num_backgrounds {
+            let mut background = RoomBackground::default();
+            background.visible = stream.next_bool()?;
+            background.foreground = stream.next_bool()?;
+            background.background = stream.next_i32()?;
+            background.x = stream.next_i32()?;
+            background.y = stream.next_i32()?;
+            background.tile_h = stream.next_bool()?;
+            background.tile_v = stream.next_bool()?;
+            background.h_speed = stream.next_i32()?;
+            background.v_speed = stream.next_i32()?;
+            background.stretch = stream.next_bool()?;
+            room.backgrounds.push(background);
+        }
+
+        room.enable_views = stream.next_bool()?;
+        let num_views = stream.next_u32()?;
+        for _ in 0..num_views {
+            let mut view = RoomView::default();
+            view.visible = stream.next_bool()?;
+            view.view_x = stream.next_u32()?;
+            view.view_y = stream.next_u32()?;
+            view.view_width = stream.next_u32()?;
+            view.view_height = stream.next_u32()?;
+            view.port_x = stream.next_u32()?;
+            view.port_y = stream.next_u32()?;
+            view.port_width = stream.next_u32()?;
+            view.port_height = stream.next_u32()?;
+            view.h_border = stream.next_u32()?;
+            view.v_border = stream.next_u32()?;
+            view.h_speed = stream.next_i32()?;
+            view.v_speed = stream.next_i32()?;
+            view.target_object = stream.next_i32()?;
+            room.views.push(view);
+        }
+
+        let num_instances = stream.next_u32()?;
+        for _ in 0..num_instances {
+            let mut instance = RoomInstance::default();
+            instance.x = stream.next_i32()?;
+            instance.y = stream.next_i32()?;
+            instance.object = stream.next_i32()?;
+            instance.id = stream.next_i32()?;
+            instance.creation_code = stream.next_string()?;
+            room.instances.push(instance);
+        }
+
+        let num_tiles = stream.next_u32()?;
+        for _ in 0..num_tiles {
+            let mut tile = RoomTile::default();
+            tile.x = stream.next_i32()?;
+            tile.y = stream.next_i32()?;
+            tile.background = stream.next_i32()?;
+            tile.tile_x = stream.next_i32()?;
+            tile.tile_y = stream.next_i32()?;
+            tile.width = stream.next_u32()?;
+            tile.height = stream.next_u32()?;
+            tile.depth = stream.next_i32()?;
+            tile.id = stream.next_i32()?;
+            room.tiles.push(tile);
+        }
+
+        game.rooms.push(room);
+        assert_eof(stream);
     }
 
     let _last_object_id = stream.next_u32()?;

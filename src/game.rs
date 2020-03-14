@@ -31,6 +31,7 @@ pub struct Game {
     pub fonts: Vec<Font>,
     pub timelines: Vec<Timeline>,
     pub objects: Vec<Object>,
+    pub rooms: Vec<Room>,
 }
 
 #[derive(Default, Debug)]
@@ -201,4 +202,77 @@ pub struct ObjectEvent {
     pub event_type: u32,
     pub event_number: i32,
     pub actions: Vec<Action>,
+}
+
+#[derive(Default, Debug)]
+pub struct Room {
+    pub id: u32,
+    pub name: String,
+    pub caption: String,
+    pub width: u32,
+    pub height: u32,
+    pub speed: u32,
+    pub persistent: bool,
+    pub clear_color: u32,
+    pub clear: bool,
+    pub creation_code: String,
+    pub enable_views: bool,
+    pub backgrounds: Vec<RoomBackground>,
+    pub views: Vec<RoomView>,
+    pub instances: Vec<RoomInstance>,
+    pub tiles: Vec<RoomTile>,
+}
+
+#[derive(Default, Debug)]
+pub struct RoomBackground {
+    pub visible: bool,
+    pub foreground: bool,
+    pub background: i32,
+    pub x: i32,
+    pub y: i32,
+    pub tile_h: bool,
+    pub tile_v: bool,
+    pub h_speed: i32,
+    pub v_speed: i32,
+    pub stretch: bool,
+}
+
+#[derive(Default, Debug)]
+pub struct RoomView {
+    pub visible: bool,
+    pub view_x: u32,
+    pub view_y: u32,
+    pub view_width: u32,
+    pub view_height: u32,
+    pub port_x: u32,
+    pub port_y: u32,
+    pub port_width: u32,
+    pub port_height: u32,
+    pub h_border: u32,
+    pub v_border: u32,
+    pub h_speed: i32,
+    pub v_speed: i32,
+    pub target_object: i32,
+}
+
+#[derive(Default, Debug)]
+pub struct RoomInstance {
+    pub x: i32,
+    pub y: i32,
+    pub object: i32,
+    pub id: i32,
+    pub creation_code: String,
+}
+
+#[derive(Default, Debug)]
+pub struct RoomTile {
+    pub x: i32,
+    pub y: i32,
+    pub background: i32,
+    pub tile_x: i32,
+    pub tile_y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub depth: i32,
+    pub id: i32,
 }
