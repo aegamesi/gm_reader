@@ -3,7 +3,7 @@ extern crate crc;
 mod gmstream;
 
 use gmstream::GmStream;
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment};
+use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -539,13 +539,43 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading objects...");
     let _version = stream.next_u32()?;
     let num_objects = stream.next_u32()?;
-    for _ in 0..num_objects {
-        let mut section = stream.next_compressed()?;
-        if section.next_bool()? {
-            let name = section.next_string()?;
-            println!("Object name: {}", name);
+    game.objects.reserve(num_objects as usize);
+    for i in 0..num_objects {
+        let mut stream = stream.next_compressed()?;
+        if !stream.next_bool()? {
+            continue;
         }
-        drain(section)?;
+
+        let mut object = Object::default();
+        object.id = i;
+        object.name = stream.next_string()?;
+        let _version = stream.next_u32()?;
+        object.sprite = stream.next_i32()?;
+        object.solid = stream.next_bool()?;
+        object.visible = stream.next_bool()?;
+        object.depth = stream.next_i32()?;
+        object.persistent = stream.next_bool()?;
+        object.parent = stream.next_i32()?;
+        object.mask = stream.next_i32()?;
+
+        let num_events = stream.next_u32()? + 1;
+        for event_type in 0..num_events {
+            loop {
+                let event_number = stream.next_i32()?;
+                if event_number == -1 {
+                    break;
+                }
+
+                let mut event = ObjectEvent::default();
+                event.event_type = event_type;
+                event.event_number = event_number;
+                event.actions = read_actions(&mut stream)?;
+                object.events.push(event);
+            }
+        }
+
+        game.objects.push(object);
+        assert_eof(stream);
     }
 
     println!("Reading rooms...");

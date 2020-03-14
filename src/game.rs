@@ -29,6 +29,7 @@ pub struct Game {
     pub scripts: Vec<Script>,
     pub fonts: Vec<Font>,
     pub timelines: Vec<Timeline>,
+    pub objects: Vec<Object>,
 }
 
 #[derive(Default, Debug)]
@@ -171,5 +172,26 @@ pub struct Timeline {
 #[derive(Default, Debug)]
 pub struct TimelineMoment {
     pub position: u32,
+    pub actions: Vec<Action>,
+}
+
+#[derive(Default, Debug)]
+pub struct Object {
+    pub id: u32,
+    pub name: String,
+    pub sprite: i32,
+    pub solid: bool,
+    pub visible: bool,
+    pub depth: i32,
+    pub persistent: bool,
+    pub parent: i32,
+    pub mask: i32,
+    pub events: Vec<ObjectEvent>,
+}
+
+#[derive(Default, Debug)]
+pub struct ObjectEvent {
+    pub event_type: u32,
+    pub event_number: i32,
     pub actions: Vec<Action>,
 }
