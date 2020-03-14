@@ -79,6 +79,7 @@ pub struct Settings {
     pub error_log: bool,
     pub error_abort: bool,
     pub uninitialized_zero: bool,
+    pub uninitialized_arguments_error: bool,
 }
 
 #[derive(Default, Debug)]

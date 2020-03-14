@@ -264,7 +264,6 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         game.settings.priority = stream.next_u32()?;
         game.settings.freeze = stream.next_bool()?;
 
-        // TODO loading bar
         game.settings.loading_bar = stream.next_u32()?;
         if game.settings.loading_bar > 0 {
             if stream.next_bool()? {
@@ -287,7 +286,9 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         game.settings.error_display = stream.next_bool()?;
         game.settings.error_log = stream.next_bool()?;
         game.settings.error_abort = stream.next_bool()?;
-        game.settings.uninitialized_zero = stream.next_bool()?;
+        let uninitialized_zero = stream.next_u32()?;
+        game.settings.uninitialized_zero = (uninitialized_zero & 0x1) > 0;
+        game.settings.uninitialized_arguments_error = (uninitialized_zero & 0x2) > 0;
         assert_eof(stream);
     }
 
