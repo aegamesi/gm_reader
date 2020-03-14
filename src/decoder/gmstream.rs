@@ -17,13 +17,13 @@ pub trait GmStream: Sized {
 
     fn next_string(&mut self) -> io::Result<String>;
 
-    fn next_section(&mut self) -> io::Result<Vec<u8>>;
+    fn next_blob(&mut self) -> io::Result<Vec<u8>>;
 
     fn skip(&mut self, bytes: u32) -> io::Result<()>;
 
     fn next_compressed(&mut self) -> io::Result<ZlibDecoder<Take<&mut Self>>>;
 
-    fn skip_section(&mut self) -> io::Result<()>;
+    fn skip_blob(&mut self) -> io::Result<()>;
 }
 
 impl<T: Read> GmStream for T {
@@ -46,13 +46,13 @@ impl<T: Read> GmStream for T {
     }
 
     fn next_string(&mut self) -> io::Result<String> {
-        let data = self.next_section()?;
+        let data = self.next_blob()?;
         let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(&data);
         let string = decoded.to_string();
         Ok(string)
     }
 
-    fn next_section(&mut self) -> io::Result<Vec<u8>> {
+    fn next_blob(&mut self) -> io::Result<Vec<u8>> {
         let length = self.next_u32()?;
         let mut data = Vec::with_capacity(length as usize);
         self.take(length as u64).read_to_end(&mut data)?;
@@ -75,7 +75,7 @@ impl<T: Read> GmStream for T {
         Ok(decoder)
     }
 
-    fn skip_section(&mut self) -> io::Result<()> {
+    fn skip_blob(&mut self) -> io::Result<()> {
         let length = GmStream::next_u32(self)?;
         self.skip(length)
     }

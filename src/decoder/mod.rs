@@ -267,14 +267,14 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         game.settings.loading_bar = stream.next_u32()?;
         if game.settings.loading_bar > 0 {
             if stream.next_bool()? {
-                game.settings.loading_bar_back = Some(stream.next_section()?);
+                game.settings.loading_bar_back = Some(stream.next_blob()?);
             }
             if stream.next_bool()? {
-                game.settings.loading_bar_front = Some(stream.next_section()?);
+                game.settings.loading_bar_front = Some(stream.next_blob()?);
             }
         }
         if stream.next_bool()? {
-            game.settings.loading_background = Some(stream.next_section()?);
+            game.settings.loading_background = Some(stream.next_blob()?);
         } else {
             game.settings.loading_background = None;
         }
@@ -312,28 +312,29 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         game.guid[i] = stream.next_u32()?;
     }
 
+    // TODO: finish reading extensions
     println!("Reading extensions...");
     let _version = stream.next_u32()?;
     let num_extensions = stream.next_u32()?;
     for _ in 0..num_extensions {
         stream.skip(4)?;
         println!("Extension Name: {}", stream.next_string()?);
-        stream.skip_section()?;
+        stream.skip_blob()?;
 
         let count = stream.next_u32()?;
         for _ in 0..count {
             stream.skip(4)?;
-            stream.skip_section()?;
+            stream.skip_blob()?;
             stream.skip(4)?;
-            stream.skip_section()?;
-            stream.skip_section()?;
+            stream.skip_blob()?;
+            stream.skip_blob()?;
 
             // Args?
             let count = stream.next_u32()?;
             for _ in 0..count {
                 stream.skip(4)?;
-                stream.skip_section()?;
-                stream.skip_section()?;
+                stream.skip_blob()?;
+                stream.skip_blob()?;
                 stream.skip(4 * 3)?;
 
                 stream.skip(4 * 18)?;
@@ -343,13 +344,13 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
             let count = stream.next_u32()?;
             for _ in 0..count {
                 stream.skip(4)?;
-                stream.skip_section()?;
-                stream.skip_section()?;
+                stream.skip_blob()?;
+                stream.skip_blob()?;
             }
         }
 
         // read resources files?
-        stream.skip_section()?;
+        stream.skip_blob()?;
     }
 
     println!("Reading triggers...");
@@ -402,7 +403,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         sound.filetype = stream.next_string()?;
         sound.filename = stream.next_string()?;
         if stream.next_bool()? {
-            sound.data = stream.next_section()?;
+            sound.data = stream.next_blob()?;
         }
         sound.effects = stream.next_u32()?;
         sound.volume = stream.next_f64()?;
@@ -438,7 +439,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
             let mut frame = SpriteFrame::default();
             let _version = stream.next_u32()?;
             frame.size = (stream.next_u32()?, stream.next_u32()?);
-            frame.data = stream.next_section()?;
+            frame.data = stream.next_blob()?;
             sprite.frames.push(frame);
         }
 
@@ -482,7 +483,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         let _version = stream.next_u32()?;
         background.size = (stream.next_u32()?, stream.next_u32()?);
         if background.size.0 > 0 && background.size.1 > 0 {
-            background.data = stream.next_section()?;
+            background.data = stream.next_blob()?;
         }
         game.backgrounds.push(background);
         assert_eof(stream);
@@ -572,7 +573,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
             glyph.kerning = stream.next_i32()?;
         }
         font.atlas.size = (stream.next_u32()?, stream.next_u32()?);
-        font.atlas.data = stream.next_section()?;
+        font.atlas.data = stream.next_blob()?;
 
         game.fonts.push(font);
         assert_eof(stream);
@@ -758,7 +759,7 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         include.original_size = stream.next_u32()?;
         include.store_in_editable = stream.next_bool()?;
         if include.original_chosen && include.store_in_editable {
-            include.data = stream.next_section()?;
+            include.data = stream.next_blob()?;
         }
         include.export = stream.next_u32()?;
         include.export_folder = stream.next_string()?;
@@ -805,11 +806,9 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     }
 
     let remaining = drain(stream)?;
-    println!("Remaining bytes: {}", remaining);
+    println!("Garbage bytes at end: {}", remaining);
 
     println!("Done");
-    // println!("#### {}", stream.read_string()?);
-
     Ok(())
 }
 
@@ -825,7 +824,7 @@ pub fn decode<T: Read + Seek>(mut stream: T) -> io::Result<Game> {
         let mut stream = decrypt_gm530(&mut stream, key)?;
 
         let _ = stream.next_u32()?;
-        stream.skip_section()?;
+        stream.skip_blob()?;
 
         // At this point, stream contains a V 5.3a GMD.
     } else if detect_gm6xx(&mut stream)? {
