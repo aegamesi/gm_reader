@@ -219,6 +219,7 @@ fn read_actions<T: Read>(stream: &mut T) -> io::Result<Vec<Action>> {
     let mut actions = Vec::new();
     let _version = stream.next_u32()?;
     let num_actions = stream.next_u32()?;
+    actions.reserve(num_actions as usize);
     for _ in 0..num_actions {
         actions.push(read_action(stream)?);
     }
