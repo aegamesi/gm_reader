@@ -10,7 +10,7 @@ pub trait GmStream: Sized {
     fn next_i32(&mut self) -> io::Result<i32>;
 
     fn next_bool(&mut self) -> io::Result<bool> {
-        Ok(GmStream::next_u32(self)? != 0)
+        Ok(GmStream::next_i32(self)? > 0)
     }
 
     fn next_f64(&mut self) -> io::Result<f64>;

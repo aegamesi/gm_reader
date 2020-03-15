@@ -4,7 +4,7 @@ mod decrypt;
 use gmstream::GmStream;
 use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile, Include, Trigger, FontAtlasGlyph};
 use std::io;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Cursor};
 
 fn drain<T: Read>(mut s: T) -> io::Result<u64> {
     io::copy(&mut s, &mut io::sink())
@@ -109,6 +109,82 @@ fn read_actions<T: Read>(stream: &mut T) -> io::Result<Vec<Action>> {
     Ok(actions)
 }
 
+fn read_compressed<T: Read + Seek, F: Fn(&mut Game, &mut Cursor<Vec<u8>>) -> io::Result<()>>(game: &mut Game, stream: &mut T, reader: F) -> io::Result<()> {
+    let mut stream = stream.next_compressed()?;
+    let out = reader(game, &mut stream);
+    assert_eof(stream);
+    out
+}
+
+fn read_settings<T: Read + Seek>(game: &mut Game, stream: &mut T) -> io::Result<()> {
+    game.settings.fullscreen = stream.next_bool()?;
+    if game.version >= Version::Gm600 {
+        game.settings.interpolation = stream.next_bool()?;
+    }
+    game.settings.hide_border = stream.next_bool()?;
+    game.settings.show_cursor = stream.next_bool()?;
+    game.settings.scaling = stream.next_i32()?;
+    game.settings.resizable = stream.next_bool()?;
+    game.settings.always_on_top = stream.next_bool()?;
+    game.settings.background_color = stream.next_u32()?;
+
+    game.settings.set_resolution = stream.next_bool()?;
+    game.settings.color_depth = stream.next_u32()?;
+    game.settings.resolution = stream.next_u32()?;
+    game.settings.frequency = stream.next_u32()?;
+    game.settings.hide_buttons = stream.next_bool()?;
+    game.settings.vsync = stream.next_bool()?;
+    if game.version >= Version::Gm800 {
+        game.settings.disable_screensaver = stream.next_bool()?;
+    }
+
+    game.settings.default_f4 = stream.next_bool()?;
+    game.settings.default_f1 = stream.next_bool()?;
+    game.settings.default_esc = stream.next_bool()?;
+    game.settings.default_f5 = stream.next_bool()?;
+    if game.version >= Version::Gm700 {
+        game.settings.default_f9 = stream.next_bool()?;
+        game.settings.close_as_esc = stream.next_bool()?;
+    }
+    game.settings.priority = stream.next_u32()?;
+    game.settings.freeze = stream.next_bool()?;
+
+    game.settings.loading_bar = stream.next_u32()?;
+    if game.settings.loading_bar > 0 {
+        if stream.next_bool()? {
+            game.settings.loading_bar_back = Some(stream.next_blob()?);
+        }
+        if stream.next_bool()? {
+            game.settings.loading_bar_front = Some(stream.next_blob()?);
+        }
+    }
+
+    game.settings.loading_background = None;
+    if stream.next_bool()? {
+        if game.version >= Version::Gm800 {
+            game.settings.loading_background = Some(stream.next_blob()?);
+        } else {
+            game.settings.loading_background = Some(stream.next_compressed()?.into_inner());
+        }
+    }
+
+    game.settings.load_transparent = stream.next_bool()?;
+    game.settings.load_alpha = stream.next_u32()?;
+    game.settings.load_scale = stream.next_bool()?;
+
+    game.settings.error_display = stream.next_bool()?;
+    game.settings.error_log = stream.next_bool()?;
+    game.settings.error_abort = stream.next_bool()?;
+    if game.version >= Version::Gm810 {
+        let data = stream.next_u32()?;
+        game.settings.uninitialized_zero = (data & 0x1) > 0;
+        game.settings.uninitialized_arguments_error = (data & 0x2) > 0;
+    } else {
+        game.settings.uninitialized_zero = stream.next_bool()?;
+    }
+    Ok(())
+}
+
 fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
     println!("Reading header...");
     if let Version::Gm810 = game.version {
@@ -120,60 +196,10 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
 
     println!("Reading settings...");
     let _version = stream.next_u32()?;
-    {
-        let mut stream = stream.next_compressed()?;
-        game.settings.fullscreen = stream.next_bool()?;
-        game.settings.interpolation = stream.next_bool()?;
-        game.settings.hide_border = stream.next_bool()?;
-        game.settings.show_cursor = stream.next_bool()?;
-        game.settings.scaling = stream.next_i32()?;
-        game.settings.resizable = stream.next_bool()?;
-        game.settings.always_on_top = stream.next_bool()?;
-        game.settings.background_color = stream.next_u32()?;
-
-        game.settings.set_resolution = stream.next_bool()?;
-        game.settings.color_depth = stream.next_u32()?;
-        game.settings.resolution = stream.next_u32()?;
-        game.settings.frequency = stream.next_u32()?;
-        game.settings.hide_buttons = stream.next_bool()?;
-        game.settings.vsync = stream.next_bool()?;
-        game.settings.disable_screensaver = stream.next_bool()?;
-
-        game.settings.default_f4 = stream.next_bool()?;
-        game.settings.default_f1 = stream.next_bool()?;
-        game.settings.default_esc = stream.next_bool()?;
-        game.settings.default_f5 = stream.next_bool()?;
-        game.settings.default_f9 = stream.next_bool()?;
-        game.settings.close_as_esc = stream.next_bool()?;
-        game.settings.priority = stream.next_u32()?;
-        game.settings.freeze = stream.next_bool()?;
-
-        game.settings.loading_bar = stream.next_u32()?;
-        if game.settings.loading_bar > 0 {
-            if stream.next_bool()? {
-                game.settings.loading_bar_back = Some(stream.next_blob()?);
-            }
-            if stream.next_bool()? {
-                game.settings.loading_bar_front = Some(stream.next_blob()?);
-            }
-        }
-        if stream.next_bool()? {
-            game.settings.loading_background = Some(stream.next_blob()?);
-        } else {
-            game.settings.loading_background = None;
-        }
-
-        game.settings.load_transparent = stream.next_bool()?;
-        game.settings.load_alpha = stream.next_u32()?;
-        game.settings.load_scale = stream.next_bool()?;
-
-        game.settings.error_display = stream.next_bool()?;
-        game.settings.error_log = stream.next_bool()?;
-        game.settings.error_abort = stream.next_bool()?;
-        let uninitialized_zero = stream.next_u32()?;
-        game.settings.uninitialized_zero = (uninitialized_zero & 0x1) > 0;
-        game.settings.uninitialized_arguments_error = (uninitialized_zero & 0x2) > 0;
-        assert_eof(stream);
+    if game.version >= Version::Gm800 {
+        read_compressed(game, &mut stream, read_settings)?;
+    } else {
+        read_settings(game, &mut stream)?;
     }
 
     // Skip d3dx8.dll (name and then content).
