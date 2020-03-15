@@ -1,10 +1,11 @@
 mod gmstream;
 mod decrypt;
+mod detect;
 
 use gmstream::GmStream;
 use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile, Include, Trigger, FontAtlasGlyph};
 use std::io;
-use std::io::{Read, Seek, SeekFrom, Cursor};
+use std::io::{Read, Seek, Cursor};
 
 fn drain<T: Read>(mut s: T) -> io::Result<u64> {
     io::copy(&mut s, &mut io::sink())
@@ -13,55 +14,6 @@ fn drain<T: Read>(mut s: T) -> io::Result<u64> {
 fn assert_eof<T: Read>(s: T) {
     let bytes_remaining = drain(s).unwrap();
     assert_eq!(bytes_remaining, 0)
-}
-
-fn detect_gm800<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
-    stream.seek(SeekFrom::Start(2000000))?;
-
-    Ok(stream.next_u32()? == 1234321)
-}
-
-fn detect_gm810<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
-    stream.seek(SeekFrom::Start(0x0039FBC4))?;
-
-    for _ in 0..1024 {
-        if stream.next_u32()? & 0xFF00FF00 == 0xF7000000 {
-            if stream.next_u32()? & 0x00FF00FF == 0x00140067 {
-                return Ok(true);
-            }
-        }
-    }
-
-    Ok(false)
-}
-
-fn detect_gm6xx<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
-    let start_offsets = [0, 700000, 800000, 1420000, 1600000];
-    let _icon_offsets = [-1, 457832, 486668, 1296488, 1393932];
-
-    for offset in &start_offsets {
-        stream.seek(SeekFrom::Start(*offset))?;
-        if stream.next_u32()? == 1234321 && stream.next_u32()? == 600 {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn detect_gm530<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
-    stream.seek(SeekFrom::Start(1500000))?;
-    let magic = stream.next_u32()?;
-    if magic != 1230500 {
-        return Ok(false);
-    }
-
-    Ok(true)
-}
-
-fn detect_gm700<T: Read + Seek>(stream: &mut T) -> io::Result<bool> {
-    stream.seek(SeekFrom::Start(1980000))?;
-
-    Ok(stream.next_u32()? == 1234321)
 }
 
 fn read_action<T: Read>(stream: &mut T) -> io::Result<Action> {
@@ -714,45 +666,18 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         game.room_order.push(stream.next_u32()?);
     }
 
-    // Read garbage data at the end.
-    drain(stream)?;
-
     Ok(())
 }
 
-pub fn decode<T: Read + Seek>(mut stream: T) -> io::Result<Game> {
+pub fn decode<T: Read + Seek>(stream: T) -> io::Result<Game> {
     let mut project = Game::default();
     project.version = Version::Unknown;
 
-    if detect_gm530(&mut stream)? {
-        println!("Detected GM 5.3A Exe");
-        project.version = Version::Gm530;
-
-        let key = stream.next_u32()?;
-        let mut stream = decrypt::decrypt_gm530(&mut stream, key)?;
-
-        let _ = stream.next_u32()?;
-        stream.skip_blob()?;
-
-        // At this point, stream contains a V 5.3a GMD.
-    } else if detect_gm6xx(&mut stream)? {
-        println!("Detected GM 6.0/6.1 Exe");
-        project.version = Version::Gm600;
-    } else if detect_gm700(&mut stream)? {
-        println!("Detected GM 7.0 Exe");
-        project.version = Version::Gm700;
+    if let Some(data) = detect::decode(stream) {
+        project.version = data.version;
+        println!("Detected {:?}.", project.version);
+        let mut stream = Cursor::new(data.data);
         parse_exe(&mut project, &mut stream)?;
-    } else if detect_gm800(&mut stream)? {
-        println!("Detected GM 8.0 Exe");
-        project.version = Version::Gm800;
-        parse_exe(&mut project, &mut stream)?;
-    } else if detect_gm810(&mut stream)? {
-        println!("Detected GM 8.1 Exe");
-        project.version = Version::Gm810;
-        let mut stream = decrypt::decrypt_gm810(&mut stream)?;
-        parse_exe(&mut project, &mut stream)?;
-    } else {
-        println!("Unknown file");
     }
 
     Ok(project)
