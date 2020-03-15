@@ -101,23 +101,29 @@ fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     let mut stream = SectionWrapper::new(stream, version >= 800)?;
 
     game.settings.fullscreen = stream.next_bool()?;
-    if game.version >= Version::Gm600 {
+    if version >= 600 {
         game.settings.interpolation = stream.next_bool()?;
     }
     game.settings.hide_border = stream.next_bool()?;
     game.settings.show_cursor = stream.next_bool()?;
-    game.settings.scaling = stream.next_i32()?;
-    game.settings.resizable = stream.next_bool()?;
-    game.settings.always_on_top = stream.next_bool()?;
-    game.settings.background_color = stream.next_u32()?;
+    if version >= 542 {
+        game.settings.scaling = stream.next_i32()?;
+        game.settings.resizable = stream.next_bool()?;
+        game.settings.always_on_top = stream.next_bool()?;
+        game.settings.background_color = stream.next_u32()?;
+    }
 
     game.settings.set_resolution = stream.next_bool()?;
-    game.settings.color_depth = stream.next_u32()?;
-    game.settings.resolution = stream.next_u32()?;
-    game.settings.frequency = stream.next_u32()?;
+    if version >= 542 {
+        game.settings.color_depth = stream.next_u32()?;
+        game.settings.resolution = stream.next_u32()?;
+        game.settings.frequency = stream.next_u32()?;
+    }
     game.settings.hide_buttons = stream.next_bool()?;
-    game.settings.vsync = stream.next_bool()?;
-    if game.version >= Version::Gm800 {
+    if version >= 542 {
+        game.settings.vsync = stream.next_bool()?;
+    }
+    if version >= 800 {
         game.settings.disable_screensaver = stream.next_bool()?;
     }
 
@@ -125,7 +131,7 @@ fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     game.settings.default_f1 = stream.next_bool()?;
     game.settings.default_esc = stream.next_bool()?;
     game.settings.default_f5 = stream.next_bool()?;
-    if game.version >= Version::Gm700 {
+    if version >= 702 {
         game.settings.default_f9 = stream.next_bool()?;
         game.settings.close_as_esc = stream.next_bool()?;
     }
@@ -158,12 +164,22 @@ fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     game.settings.error_display = stream.next_bool()?;
     game.settings.error_log = stream.next_bool()?;
     game.settings.error_abort = stream.next_bool()?;
-    if game.version >= Version::Gm810 {
+    if version >= 800 {
         let data = stream.next_u32()?;
         game.settings.uninitialized_zero = (data & 0x1) > 0;
         game.settings.uninitialized_arguments_error = (data & 0x2) > 0;
     } else {
         game.settings.uninitialized_zero = stream.next_bool()?;
+
+        // Read constants.
+        let num_constants = stream.next_u32()?;
+        game.constants.reserve(num_constants as usize);
+        for _ in 0..num_constants {
+            let mut constant = Constant::default();
+            constant.name = stream.next_string()?;
+            constant.value = stream.next_string()?;
+            game.constants.push(constant);
+        }
     }
     Ok(())
 }
@@ -748,6 +764,48 @@ fn parse_gm8xx_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result
     Ok(())
 }
 
+fn parse_gm700_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
+    game.debug = stream.next_bool()?;
+
+    read_settings(game, &mut stream)?;
+
+    // Skip d3dx8.dll (name and then content).
+    stream.skip_blob()?;
+    stream.skip_blob()?;
+
+    // TODO Decompress and decrypt GM 7.0.
+
+    game.pro = stream.next_bool()?;
+    game.game_id = stream.next_u32()?;
+    for i in 0..4 {
+        game.guid[i] = stream.next_u32()?;
+    }
+
+    read_extensions(game, &mut stream)?;
+    read_triggers(game, &mut stream)?;
+    read_constants(game, &mut stream)?;
+    read_sounds(game, &mut stream)?;
+    read_sprites(game, &mut stream)?;
+    read_backgrounds(game, &mut stream)?;
+    read_paths(game, &mut stream)?;
+    read_scripts(game, &mut stream)?;
+    read_fonts(game, &mut stream)?;
+    read_timelines(game, &mut stream)?;
+    read_objects(game, &mut stream)?;
+    read_rooms(game, &mut stream)?;
+
+    game.last_object_id = stream.next_u32()?;
+    game.last_tile_id = stream.next_u32()?;
+
+    read_includes(game, &mut stream)?;
+    read_help(game, &mut stream)?;
+    read_library_init_scripts(game, &mut stream)?;
+    read_room_order(game, &mut stream)?;
+
+    Ok(())
+}
+
+
 pub fn decode<T: Read + Seek>(stream: T) -> io::Result<Game> {
     let mut project = Game::default();
     project.version = Version::Unknown;
@@ -758,6 +816,7 @@ pub fn decode<T: Read + Seek>(stream: T) -> io::Result<Game> {
         let mut stream = Cursor::new(data.data);
         match project.version {
             Version::Gm800 | Version::Gm810 => parse_gm8xx_exe(&mut project, &mut stream)?,
+            Version::Gm700 => parse_gm700_exe(&mut project, &mut stream)?,
             _ => unimplemented!()
         }
     }
