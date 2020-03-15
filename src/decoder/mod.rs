@@ -18,6 +18,13 @@ fn assert_eof<T: Read>(s: T) {
     assert_eq!(bytes_remaining, 0)
 }
 
+fn read_compressed<F: Fn(&mut Game, &mut BufferStream) -> io::Result<R>, R>(game: &mut Game, stream: &mut BufferStream, reader: F) -> io::Result<R> {
+    let mut stream = stream.next_compressed()?;
+    let out = reader(game, &mut stream);
+    assert_eof(stream);
+    out
+}
+
 fn read_action(stream: &mut BufferStream) -> io::Result<Action> {
     let mut action = Action::default();
     let _version = stream.next_u32()?;
@@ -61,13 +68,6 @@ fn read_actions(stream: &mut BufferStream) -> io::Result<Vec<Action>> {
         actions.push(read_action(stream)?);
     }
     Ok(actions)
-}
-
-fn read_compressed<F: Fn(&mut Game, &mut BufferStream) -> io::Result<R>, R>(game: &mut Game, stream: &mut BufferStream, reader: F) -> io::Result<R> {
-    let mut stream = stream.next_compressed()?;
-    let out = reader(game, &mut stream);
-    assert_eof(stream);
-    out
 }
 
 fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
@@ -139,38 +139,7 @@ fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     Ok(())
 }
 
-fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
-    println!("Reading header...");
-    game.debug = stream.next_bool()?;
-
-    println!("Reading settings...");
-    let _version = stream.next_u32()?;
-    if game.version >= Version::Gm800 {
-        read_compressed(game, &mut stream, read_settings)?;
-    } else {
-        read_settings(game, &mut stream)?;
-    }
-
-    // Skip d3dx8.dll (name and then content).
-    let len = stream.next_u32()?;
-    stream.skip(len)?;
-    let len = stream.next_u32()?;
-    stream.skip(len)?;
-
-    // Do the main "decryption".
-    println!("Decrypting inner...");
-    let mut stream = decrypt::decrypt_gm8xx(stream)?;
-
-    // Skip junk
-    let len = stream.next_u32()?;
-    stream.skip(len * 4)?;
-
-    game.pro = stream.next_bool()?;
-    game.game_id = stream.next_u32()?;
-    for i in 0..4 {
-        game.guid[i] = stream.next_u32()?;
-    }
-
+fn read_extensions(_game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     // TODO: finish reading extensions
     println!("Reading extensions...");
     let _version = stream.next_u32()?;
@@ -211,7 +180,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         // read resources files?
         stream.skip_blob()?;
     }
+    Ok(())
+}
 
+fn read_triggers(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading triggers...");
     let _version = stream.next_u32()?;
     let num_triggers = stream.next_u32()?;
@@ -232,7 +204,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.triggers.push(trigger);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_constants(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading constants...");
     let _version = stream.next_u32()?;
     let num_constants = stream.next_u32()?;
@@ -243,7 +218,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         constant.value = stream.next_string()?;
         game.constants.push(constant);
     }
+    Ok(())
+}
 
+fn read_sounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading sounds...");
     let _version = stream.next_u32()?;
     let num_sounds = stream.next_u32()?;
@@ -271,7 +249,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.sounds.push(sound);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading sprites...");
     let _version = stream.next_u32()?;
     let num_sprites = stream.next_u32()?;
@@ -324,7 +305,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.sprites.push(sprite);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_backgrounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading backgrounds...");
     let _version = stream.next_u32()?;
     let num_backgrounds = stream.next_u32()?;
@@ -347,7 +331,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.backgrounds.push(background);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_paths(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading paths...");
     let _version = stream.next_u32()?;
     let num_paths = stream.next_u32()?;
@@ -377,7 +364,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.paths.push(path);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_scripts(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading scripts...");
     let _version = stream.next_u32()?;
     let num_scripts = stream.next_u32()?;
@@ -396,7 +386,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.scripts.push(script);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_fonts(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading fonts...");
     let _version = stream.next_u32()?;
     let num_fonts = stream.next_u32()?;
@@ -440,7 +433,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.fonts.push(font);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_timelines(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading timelines...");
     let _version = stream.next_u32()?;
     let num_timelines = stream.next_u32()?;
@@ -466,7 +462,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.timelines.push(timeline);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_objects(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading objects...");
     let _version = stream.next_u32()?;
     let num_objects = stream.next_u32()?;
@@ -508,7 +507,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.objects.push(object);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_rooms(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading rooms...");
     let _version = stream.next_u32()?;
     let num_rooms = stream.next_u32()?;
@@ -599,10 +601,10 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.rooms.push(room);
         assert_eof(stream);
     }
+    Ok(())
+}
 
-    game.last_object_id = stream.next_u32()?;
-    game.last_tile_id = stream.next_u32()?;
-
+fn read_includes(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading includes...");
     let _version = stream.next_u32()?;
     let num_includes = stream.next_u32()?;
@@ -628,33 +630,40 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
         game.includes.push(include);
         assert_eof(stream);
     }
+    Ok(())
+}
 
+fn read_help(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading help...");
     let _version = stream.next_u32()?;
-    {
-        let mut stream = stream.next_compressed()?;
-        game.help.background_color = stream.next_u32()?;
-        game.help.separate_window = stream.next_bool()?;
-        game.help.caption = stream.next_string()?;
-        game.help.left = stream.next_i32()?;
-        game.help.top = stream.next_i32()?;
-        game.help.width = stream.next_i32()?;
-        game.help.height = stream.next_i32()?;
-        game.help.show_border = stream.next_bool()?;
-        game.help.allow_resize = stream.next_bool()?;
-        game.help.always_on_top = stream.next_bool()?;
-        game.help.freeze_game = stream.next_bool()?;
-        game.help.content = stream.next_string()?;
-        assert_eof(stream);
-    }
+    let mut stream = stream.next_compressed()?;
+    game.help.background_color = stream.next_u32()?;
+    game.help.separate_window = stream.next_bool()?;
+    game.help.caption = stream.next_string()?;
+    game.help.left = stream.next_i32()?;
+    game.help.top = stream.next_i32()?;
+    game.help.width = stream.next_i32()?;
+    game.help.height = stream.next_i32()?;
+    game.help.show_border = stream.next_bool()?;
+    game.help.allow_resize = stream.next_bool()?;
+    game.help.always_on_top = stream.next_bool()?;
+    game.help.freeze_game = stream.next_bool()?;
+    game.help.content = stream.next_string()?;
+    assert_eof(stream);
+    Ok(())
+}
 
+fn read_library_init_scripts(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading library init scripts...");
     let _version = stream.next_u32()?;
     let num_init_scripts = stream.next_u32()?;
     for _ in 0..num_init_scripts {
         game.library_init_scripts.push(stream.next_string()?);
     }
+    Ok(())
+}
 
+fn read_room_order(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading room order...");
     let _version = stream.next_u32()?;
     let num_rooms = stream.next_u32()?;
@@ -662,6 +671,61 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
     for _ in 0..num_rooms {
         game.room_order.push(stream.next_u32()?);
     }
+    Ok(())
+}
+
+fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
+    println!("Reading header...");
+    game.debug = stream.next_bool()?;
+
+    println!("Reading settings...");
+    let _version = stream.next_u32()?;
+    if game.version >= Version::Gm800 {
+        read_compressed(game, &mut stream, read_settings)?;
+    } else {
+        read_settings(game, &mut stream)?;
+    }
+
+    // Skip d3dx8.dll (name and then content).
+    let len = stream.next_u32()?;
+    stream.skip(len)?;
+    let len = stream.next_u32()?;
+    stream.skip(len)?;
+
+    // Do the main "decryption".
+    println!("Decrypting inner...");
+    let mut stream = decrypt::decrypt_gm8xx(stream)?;
+
+    // Skip junk
+    let len = stream.next_u32()?;
+    stream.skip(len * 4)?;
+
+    game.pro = stream.next_bool()?;
+    game.game_id = stream.next_u32()?;
+    for i in 0..4 {
+        game.guid[i] = stream.next_u32()?;
+    }
+
+    read_extensions(game, &mut stream)?;
+    read_triggers(game, &mut stream)?;
+    read_constants(game, &mut stream)?;
+    read_sounds(game, &mut stream)?;
+    read_sprites(game, &mut stream)?;
+    read_backgrounds(game, &mut stream)?;
+    read_paths(game, &mut stream)?;
+    read_scripts(game, &mut stream)?;
+    read_fonts(game, &mut stream)?;
+    read_timelines(game, &mut stream)?;
+    read_objects(game, &mut stream)?;
+    read_rooms(game, &mut stream)?;
+
+    game.last_object_id = stream.next_u32()?;
+    game.last_tile_id = stream.next_u32()?;
+
+    read_includes(game, &mut stream)?;
+    read_help(game, &mut stream)?;
+    read_library_init_scripts(game, &mut stream)?;
+    read_room_order(game, &mut stream)?;
 
     Ok(())
 }
