@@ -18,11 +18,36 @@ fn assert_eof<T: Read>(s: T) {
     assert_eq!(bytes_remaining, 0)
 }
 
-fn read_compressed<F: Fn(&mut Game, &mut BufferStream) -> io::Result<R>, R>(game: &mut Game, stream: &mut BufferStream, reader: F) -> io::Result<R> {
-    let mut stream = stream.next_compressed()?;
-    let out = reader(game, &mut stream);
-    assert_eof(stream);
-    out
+enum SectionWrapper<'a> {
+    Owned(BufferStream),
+    Borrowed(&'a mut BufferStream),
+}
+
+impl<'a> SectionWrapper<'a> {
+    fn new(stream: &'a mut BufferStream, compressed: bool) -> io::Result<Self> {
+        if compressed {
+            Ok(SectionWrapper::Owned(stream.next_compressed()?))
+        } else {
+            Ok(SectionWrapper::Borrowed(stream))
+        }
+    }
+}
+
+impl Read for SectionWrapper<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            SectionWrapper::Owned(stream) => stream.read(buf),
+            SectionWrapper::Borrowed(stream) => stream.read(buf),
+        }
+    }
+}
+
+impl Drop for SectionWrapper<'_> {
+    fn drop(&mut self) {
+        if let SectionWrapper::Owned(stream) = self {
+            assert_eof(stream);
+        }
+    }
 }
 
 fn read_action(stream: &mut BufferStream) -> io::Result<Action> {
@@ -71,6 +96,10 @@ fn read_actions(stream: &mut BufferStream) -> io::Result<Vec<Action>> {
 }
 
 fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
+    println!("Reading settings...");
+    let version = stream.next_u32()?;
+    let mut stream = SectionWrapper::new(stream, version >= 800)?;
+
     game.settings.fullscreen = stream.next_bool()?;
     if game.version >= Version::Gm600 {
         game.settings.interpolation = stream.next_bool()?;
@@ -678,13 +707,7 @@ fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading header...");
     game.debug = stream.next_bool()?;
 
-    println!("Reading settings...");
-    let _version = stream.next_u32()?;
-    if game.version >= Version::Gm800 {
-        read_compressed(game, &mut stream, read_settings)?;
-    } else {
-        read_settings(game, &mut stream)?;
-    }
+    read_settings(game, &mut stream)?;
 
     // Skip d3dx8.dll (name and then content).
     let len = stream.next_u32()?;
