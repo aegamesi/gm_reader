@@ -21,10 +21,14 @@ fn detect_gm530<T: Read + Seek>(mut stream: &mut T) -> Result<Option<Vec<u8>>> {
         let key = stream.next_u32()?;
         let mut stream = decrypt::decrypt_gm530(&mut stream, key)?;
 
-        let _ = stream.next_u32()?;
+        let _a = stream.next_u32()?;
         stream.skip_blob()?;
 
-        return Ok(Some(read_rest(&mut stream)?));
+        let magic = stream.next_u32()?;
+        let version = stream.next_u32()?;
+        if magic == 1234321 && version == 530 {
+            return Ok(Some(read_rest(&mut stream)?));
+        }
     }
 
     Ok(None)
@@ -36,7 +40,9 @@ fn detect_gm600<T: Read + Seek>(stream: &mut T) -> Result<Option<Vec<u8>>> {
 
     for offset in &start_offsets {
         stream.seek(SeekFrom::Start(*offset))?;
-        if stream.next_u32()? == 1234321 && stream.next_u32()? == 600 {
+        let magic = stream.next_u32()?;
+        let version = stream.next_u32()?;
+        if magic == 1234321 && version == 600 {
             return Ok(Some(read_rest(stream)?));
         }
     }
@@ -46,7 +52,8 @@ fn detect_gm600<T: Read + Seek>(stream: &mut T) -> Result<Option<Vec<u8>>> {
 fn detect_gm700<T: Read + Seek>(stream: &mut T) -> Result<Option<Vec<u8>>> {
     stream.seek(SeekFrom::Start(1980000))?;
     let magic = stream.next_u32()?;
-    if magic == 1234321 {
+    let version = stream.next_u32()?;
+    if magic == 1234321 && version == 700 {
         return Ok(Some(read_rest(stream)?));
     }
     Ok(None)
@@ -55,7 +62,8 @@ fn detect_gm700<T: Read + Seek>(stream: &mut T) -> Result<Option<Vec<u8>>> {
 fn detect_gm800<T: Read + Seek>(stream: &mut T) -> Result<Option<Vec<u8>>> {
     stream.seek(SeekFrom::Start(2000000))?;
     let magic = stream.next_u32()?;
-    if magic == 1234321 {
+    let version = stream.next_u32()?;
+    if magic == 1234321 && version == 800 {
         return Ok(Some(read_rest(stream)?));
     }
     Ok(None)
@@ -68,7 +76,14 @@ fn detect_gm810<T: Read + Seek>(mut stream: &mut T) -> Result<Option<Vec<u8>>> {
         if stream.next_u32()? & 0xFF00FF00 == 0xF7000000 {
             if stream.next_u32()? & 0x00FF00FF == 0x00140067 {
                 let mut stream = decrypt::decrypt_gm810(&mut stream)?;
-                return Ok(Some(read_rest(&mut stream)?));
+                let magic = stream.next_u32()?;
+                let version = stream.next_u32()?;
+
+                if magic == 0 && version == 0 {
+                    return Ok(Some(read_rest(&mut stream)?));
+                } else {
+                    return Ok(None)
+                }
             }
         }
     }

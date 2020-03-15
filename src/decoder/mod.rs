@@ -141,11 +141,6 @@ fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
 
 fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading header...");
-    if let Version::Gm810 = game.version {
-        stream.next_u32()?;
-    }
-    let _version = stream.next_u32()?;
-    println!("{}", _version);
     game.debug = stream.next_bool()?;
 
     println!("Reading settings...");
