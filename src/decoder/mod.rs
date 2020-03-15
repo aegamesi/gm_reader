@@ -7,6 +7,8 @@ use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Backgro
 use std::io;
 use std::io::{Read, Seek, Cursor};
 
+type BufferStream = Cursor<Vec<u8>>;
+
 fn drain<T: Read>(mut s: T) -> io::Result<u64> {
     io::copy(&mut s, &mut io::sink())
 }
@@ -16,7 +18,7 @@ fn assert_eof<T: Read>(s: T) {
     assert_eq!(bytes_remaining, 0)
 }
 
-fn read_action<T: Read>(stream: &mut T) -> io::Result<Action> {
+fn read_action(stream: &mut BufferStream) -> io::Result<Action> {
     let mut action = Action::default();
     let _version = stream.next_u32()?;
     action.library_id = stream.next_u32()?;
@@ -50,7 +52,7 @@ fn read_action<T: Read>(stream: &mut T) -> io::Result<Action> {
     Ok(action)
 }
 
-fn read_actions<T: Read>(stream: &mut T) -> io::Result<Vec<Action>> {
+fn read_actions(stream: &mut BufferStream) -> io::Result<Vec<Action>> {
     let mut actions = Vec::new();
     let _version = stream.next_u32()?;
     let num_actions = stream.next_u32()?;
@@ -61,14 +63,14 @@ fn read_actions<T: Read>(stream: &mut T) -> io::Result<Vec<Action>> {
     Ok(actions)
 }
 
-fn read_compressed<T: Read + Seek, F: Fn(&mut Game, &mut Cursor<Vec<u8>>) -> io::Result<R>, R>(game: &mut Game, stream: &mut T, reader: F) -> io::Result<R> {
+fn read_compressed<F: Fn(&mut Game, &mut BufferStream) -> io::Result<R>, R>(game: &mut Game, stream: &mut BufferStream, reader: F) -> io::Result<R> {
     let mut stream = stream.next_compressed()?;
     let out = reader(game, &mut stream);
     assert_eof(stream);
     out
 }
 
-fn read_settings<T: Read + Seek>(game: &mut Game, stream: &mut T) -> io::Result<()> {
+fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     game.settings.fullscreen = stream.next_bool()?;
     if game.version >= Version::Gm600 {
         game.settings.interpolation = stream.next_bool()?;
@@ -137,7 +139,7 @@ fn read_settings<T: Read + Seek>(game: &mut Game, stream: &mut T) -> io::Result<
     Ok(())
 }
 
-fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
+fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading header...");
     if let Version::Gm810 = game.version {
         stream.next_u32()?;
