@@ -741,12 +741,8 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         assert_eof(stream);
     }
 
-    let _last_object_id = stream.next_u32()?;
-    let _last_tile_id = stream.next_u32()?;
-    println!(
-        "Last object: {}, last tile: {}",
-        _last_object_id, _last_tile_id
-    );
+    game.last_object_id = stream.next_u32()?;
+    game.last_tile_id = stream.next_u32()?;
 
     println!("Reading includes...");
     let _version = stream.next_u32()?;
@@ -808,10 +804,9 @@ fn parse_exe<T: Read + Seek>(game: &mut Game, mut stream: T) -> io::Result<()> {
         game.room_order.push(stream.next_u32()?);
     }
 
-    let remaining = drain(stream)?;
-    println!("Garbage bytes at end: {}", remaining);
+    // Read garbage data at the end.
+    drain(stream)?;
 
-    println!("Done");
     Ok(())
 }
 

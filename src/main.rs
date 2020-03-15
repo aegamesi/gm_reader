@@ -30,7 +30,7 @@ fn main() -> Result<(), std::io::Error> {
     let file = File::open(config.filename)?;
     let file = BufReader::new(file);
 
-    let project = gm_decompiler::decode(file)?;
+    let project = gm_reader::decode(file)?;
     println!("Read game with version {:?}", project.version);
 
     Ok(())

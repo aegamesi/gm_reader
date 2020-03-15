@@ -22,6 +22,9 @@ pub struct Game {
     pub game_id: u32,
     pub guid: [u32; 4],
 
+    pub last_object_id: u32,
+    pub last_tile_id: u32,
+
     pub settings: Settings,
     pub help: Help,
     pub triggers: Vec<Trigger>,
