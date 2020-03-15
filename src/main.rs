@@ -2,9 +2,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::{env, process};
 
-mod decoder;
-mod game;
-
 struct Config {
     filename: String,
 }
@@ -32,9 +29,9 @@ fn main() -> Result<(), std::io::Error> {
     println!("Reading {}", config.filename);
     let file = File::open(config.filename)?;
     let file = BufReader::new(file);
-    let project = decoder::decode(file)?;
 
-    println!("Version: {:?}", project.version);
+    let project = gm_decompiler::decode(file)?;
+    println!("Read game with version {:?}", project.version);
 
     Ok(())
 }
