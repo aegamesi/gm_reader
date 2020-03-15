@@ -109,7 +109,7 @@ fn read_actions<T: Read>(stream: &mut T) -> io::Result<Vec<Action>> {
     Ok(actions)
 }
 
-fn read_compressed<T: Read + Seek, F: Fn(&mut Game, &mut Cursor<Vec<u8>>) -> io::Result<()>>(game: &mut Game, stream: &mut T, reader: F) -> io::Result<()> {
+fn read_compressed<T: Read + Seek, F: Fn(&mut Game, &mut Cursor<Vec<u8>>) -> io::Result<R>, R>(game: &mut Game, stream: &mut T, reader: F) -> io::Result<R> {
     let mut stream = stream.next_compressed()?;
     let out = reader(game, &mut stream);
     assert_eof(stream);
