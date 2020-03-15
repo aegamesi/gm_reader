@@ -2,7 +2,7 @@ extern crate encoding_rs;
 
 use flate2::read::ZlibDecoder;
 use std::io;
-use std::io::{Read, Take};
+use std::io::Read;
 
 pub trait GmStream: Sized {
     fn next_u32(&mut self) -> io::Result<u32>;
@@ -21,7 +21,7 @@ pub trait GmStream: Sized {
 
     fn skip(&mut self, bytes: u32) -> io::Result<()>;
 
-    fn next_compressed(&mut self) -> io::Result<ZlibDecoder<Take<&mut Self>>>;
+    fn next_compressed(&mut self) -> io::Result<io::Cursor<Vec<u8>>>;
 
     fn skip_blob(&mut self) -> io::Result<()>;
 }
@@ -67,12 +67,14 @@ impl<T: Read> GmStream for T {
         }
     }
 
-    fn next_compressed(&mut self) -> io::Result<ZlibDecoder<Take<&mut T>>> {
+    fn next_compressed(&mut self) -> io::Result<io::Cursor<Vec<u8>>> {
         let length = GmStream::next_u32(self)?;
         let substream = self.take(length as u64);
-        let decoder = ZlibDecoder::new(substream);
-
-        Ok(decoder)
+        let mut decoder = ZlibDecoder::new(substream);
+        let mut buf = Vec::new();
+        decoder.read_to_end(&mut buf)?;
+        let cursor = io::Cursor::new(buf);
+        Ok(cursor)
     }
 
     fn skip_blob(&mut self) -> io::Result<()> {
