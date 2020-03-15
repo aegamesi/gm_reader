@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, PartialEq)]
 pub enum Version {
     Unknown = 0,
     Gm530 = 530,
