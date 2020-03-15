@@ -703,23 +703,18 @@ fn read_room_order(game: &mut Game, stream: &mut BufferStream) -> io::Result<()>
     Ok(())
 }
 
-fn parse_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
-    println!("Reading header...");
+fn parse_gm8xx_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result<()> {
     game.debug = stream.next_bool()?;
 
     read_settings(game, &mut stream)?;
 
     // Skip d3dx8.dll (name and then content).
-    let len = stream.next_u32()?;
-    stream.skip(len)?;
-    let len = stream.next_u32()?;
-    stream.skip(len)?;
+    stream.skip_blob()?;
+    stream.skip_blob()?;
 
-    // Do the main "decryption".
+    // Do the main "decryption" and skip junk.
     println!("Decrypting inner...");
     let mut stream = decrypt::decrypt_gm8xx(stream)?;
-
-    // Skip junk
     let len = stream.next_u32()?;
     stream.skip(len * 4)?;
 
@@ -761,7 +756,10 @@ pub fn decode<T: Read + Seek>(stream: T) -> io::Result<Game> {
         project.version = data.version;
         println!("Detected {:?}.", project.version);
         let mut stream = Cursor::new(data.data);
-        parse_exe(&mut project, &mut stream)?;
+        match project.version {
+            Version::Gm800 | Version::Gm810 => parse_gm8xx_exe(&mut project, &mut stream)?,
+            _ => unimplemented!()
+        }
     }
 
     Ok(project)
