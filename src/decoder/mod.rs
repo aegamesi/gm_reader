@@ -773,13 +773,15 @@ fn parse_gm700_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result
     stream.skip_blob()?;
     stream.skip_blob()?;
 
-    // TODO Decompress and decrypt GM 7.0.
+    let mut stream = decrypt::decrypt_gm700(stream)?;
 
     game.pro = stream.next_bool()?;
     game.game_id = stream.next_u32()?;
     for i in 0..4 {
         game.guid[i] = stream.next_u32()?;
     }
+
+    panic!();
 
     read_extensions(game, &mut stream)?;
     read_triggers(game, &mut stream)?;

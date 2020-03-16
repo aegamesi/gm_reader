@@ -1,6 +1,6 @@
 extern crate crc;
 
-use std::io::{Cursor, Read, Result, Seek, SeekFrom};
+use std::io::{Cursor, Read, Result, Seek, SeekFrom, copy};
 
 use super::gmstream::GmStream;
 
@@ -118,4 +118,72 @@ pub fn decrypt_gm530<T: Read + Seek>(stream: &mut T, key: u32) -> Result<Cursor<
     }
 
     Ok(Cursor::new(buf))
+}
+
+pub fn decrypt_gm700<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> {
+    // First uncompress, then decrypt.
+    let decompressed = stream.next_compressed()?;
+    let decrypted = deobfuscate(decompressed, 0, true, true)?;
+    Ok(Cursor::new(decrypted))
+}
+
+fn make_swap_table(seed: u32) -> [u8; 256] {
+    let mut table0: [u8; 256] = [0; 256];
+    let mut table1: [u8; 256] = [0; 256];
+
+    let a = 6 + (seed % 250);
+    let b = seed / 250;
+    for i in 0..256 {
+        table0[i] = i as u8;
+    }
+    for i in 1..10001 {
+        let j = (1 + ((i * a + b) % 254)) as usize;
+        let t = table0[j];
+        table0[j] = table0[j + 1];
+        table0[j + 1] = t;
+    }
+    for i in 1..256 {
+        table1[table0[i] as usize] = i as u8;
+    }
+    table1
+}
+
+fn do_swap(buffer: &mut [u8], table: [u8; 256], use_offset: bool, initial_offset: usize) {
+    for i in 0..buffer.len() {
+        let t = buffer[i] as usize;
+        buffer[i] = if use_offset {
+            let val = (table[t] as i64) - ((initial_offset + i) as i64);
+            (val & 0xFF) as u8
+        } else {
+            table[t]
+        }
+    }
+}
+
+fn deobfuscate(mut input: Cursor<Vec<u8>>, initial_unencrypted: u64, has_garbage: bool, use_offset: bool) -> Result<Vec<u8>> {
+    let mut output = Cursor::new(Vec::new());
+    let start_pos = input.seek(SeekFrom::Current(0))?;
+
+    copy(&mut input.by_ref().take(initial_unencrypted), &mut output)?;
+    let swap_seed = if has_garbage {
+        let s1 = input.next_u32()?;
+        let s2 = input.next_u32()?;
+        input.seek(SeekFrom::Current((4 * s1) as i64))?;
+        let seed = input.next_u32()?;
+        input.seek(SeekFrom::Current((4 * s2) as i64))?;
+        seed
+    } else {
+        input.next_u32()?
+    };
+    copy(&mut input.by_ref().take(1), &mut output)?;
+    let end_pos = input.seek(SeekFrom::Current(0))?;
+
+    let swap_start = output.get_ref().len();
+    let swap_length = copy(&mut input, &mut output)? as usize;
+    let swap_offset = (end_pos - start_pos) as usize;
+    let swap_table = make_swap_table(swap_seed);
+    let mut output = output.into_inner();
+    do_swap(&mut output[swap_start..(swap_start + swap_length)], swap_table, use_offset, swap_offset);
+
+    Ok(output)
 }
