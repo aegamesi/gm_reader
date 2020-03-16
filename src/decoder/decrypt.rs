@@ -127,7 +127,7 @@ pub fn decrypt_gm700<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> 
     Ok(Cursor::new(decrypted))
 }
 
-fn make_swap_table(seed: u32) -> [u8; 256] {
+pub fn make_swap_table(seed: u32) -> [u8; 256] {
     let mut table0: [u8; 256] = [0; 256];
     let mut table1: [u8; 256] = [0; 256];
 
@@ -148,7 +148,7 @@ fn make_swap_table(seed: u32) -> [u8; 256] {
     table1
 }
 
-fn do_swap(buffer: &mut [u8], table: [u8; 256], use_offset: bool, initial_offset: usize) {
+pub fn do_swap(buffer: &mut [u8], table: [u8; 256], use_offset: bool, initial_offset: usize) {
     for i in 0..buffer.len() {
         let t = buffer[i] as usize;
         buffer[i] = if use_offset {
