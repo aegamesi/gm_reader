@@ -35,11 +35,16 @@ fn detect_gm530<T: Read + Seek>(mut stream: &mut T) -> Result<Option<Vec<u8>>> {
 }
 
 fn detect_gm600<T: Read + Seek>(stream: &mut T) -> Result<Option<Vec<u8>>> {
-    let start_offsets = [0, 700000, 800000, 1420000, 1600000];
-    let _icon_offsets = [-1, 457832, 486668, 1296488, 1393932];
+    let offsets = [
+        (0, -1), // Raw game data
+        (700000, 457832), // GM 6.0
+        (800000, 486668), // GM 6.1
+        (1420000, 1296488), // GM 6.0 with Vista support
+        (1600000, 1393932), // GM 6.1 with Vista support
+    ];
 
-    for offset in &start_offsets {
-        stream.seek(SeekFrom::Start(*offset))?;
+    for (data_offset, _icon_offset) in &offsets {
+        stream.seek(SeekFrom::Start(*data_offset))?;
         let magic = stream.next_u32()?;
         let version = stream.next_u32()?;
         if magic == 1234321 && version == 600 {
