@@ -950,7 +950,10 @@ fn parse_gm600_exe(game: &mut Game, stream: &mut BufferStream) -> io::Result<()>
 
     println!("Reading header...");
     assert_eq!(stream.next_u32()?, 1230600);
-    stream.skip(16)?; // Unknown 16 bytes
+    let _unknown1 = stream.next_u32()?;
+    let _unknown2 = stream.next_u32()?;
+    game.pro = stream.next_bool()?;
+    let _unknown4 = stream.next_u32()?;
     assert_eq!(stream.next_u32()?, 1234321);
     assert_eq!(stream.next_u32()?, 600);
     game.debug = stream.next_bool()?;
