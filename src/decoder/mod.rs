@@ -487,7 +487,6 @@ fn read_scripts(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
             let swap_table = decrypt::make_swap_table(12345);
             decrypt::do_swap(&mut compressed, swap_table, false, 0);
             let mut decrypted = Cursor::new(compressed);
-            let _size = decrypted.next_u32()?;
             script.script = decrypted.next_string()?;
         } else if version == 800 {
             script.script = stream.next_string()?;
