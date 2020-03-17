@@ -149,20 +149,28 @@ fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     game.settings.loading_bar = stream.next_u32()?;
     if game.settings.loading_bar > 0 {
         if stream.next_bool()? {
-            game.settings.loading_bar_back = Some(stream.next_blob()?);
+            game.settings.loading_bar_back = if game.version >= Version::Gm800 {
+                Some(stream.next_blob()?)
+            } else {
+                Some(stream.next_compressed()?.into_inner())
+            };
         }
         if stream.next_bool()? {
-            game.settings.loading_bar_front = Some(stream.next_blob()?);
+            game.settings.loading_bar_front = if game.version >= Version::Gm800 {
+                Some(stream.next_blob()?)
+            } else {
+                Some(stream.next_compressed()?.into_inner())
+            };
         }
     }
 
     game.settings.loading_background = None;
     if stream.next_bool()? {
-        if game.version >= Version::Gm800 {
-            game.settings.loading_background = Some(stream.next_blob()?);
+        game.settings.loading_background = if game.version >= Version::Gm800 {
+            Some(stream.next_blob()?)
         } else {
-            game.settings.loading_background = Some(stream.next_compressed()?.into_inner());
-        }
+            Some(stream.next_compressed()?.into_inner())
+        };
     }
 
     game.settings.load_transparent = stream.next_bool()?;
@@ -810,7 +818,8 @@ fn read_library_init_scripts(game: &mut Game, stream: &mut BufferStream) -> io::
 fn read_room_order(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading room order...");
     let version = stream.next_u32()?;
-    if version == 700 {
+    if version == 540 || version == 700 {
+        // What is the difference between 540 and 700?
         let num_rooms = stream.next_u32()?;
         game.room_order.reserve(num_rooms as usize);
         for _ in 0..num_rooms {
@@ -911,6 +920,60 @@ fn parse_gm700_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result
     Ok(())
 }
 
+fn parse_gm600_exe(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
+    println!("Reading includes...");
+    let _export_folder = stream.next_u32()?;
+    let _overwrite = stream.next_bool()?;
+    let _remove_at_game_end = stream.next_bool()?;
+    loop {
+        let name = stream.next_string()?;
+        if "READY" == name {
+            break;
+        } else if "D3DX8.dll" == name {
+            stream.skip_blob()?;
+        } else {
+            // TODO actually save includes
+            stream.skip_blob()?;
+        }
+    }
+
+    println!("Decrypting inner...");
+    let mut stream = decrypt::decrypt_gm600(stream)?;
+
+    println!("Reading header...");
+    assert_eq!(stream.next_u32()?, 1230600);
+    stream.skip(16)?; // Unknown 16 bytes
+    assert_eq!(stream.next_u32()?, 1234321);
+    assert_eq!(stream.next_u32()?, 600);
+    game.debug = stream.next_bool()?;
+    game.game_id = stream.next_u32()?;
+    for i in 0..4 {
+        game.guid[i] = stream.next_u32()?;
+    }
+
+    read_settings(game, &mut stream)?;
+    read_sounds(game, &mut stream)?;
+    read_sprites(game, &mut stream)?;
+    read_backgrounds(game, &mut stream)?;
+    read_paths(game, &mut stream)?;
+    read_scripts(game, &mut stream)?;
+    read_fonts(game, &mut stream)?;
+    read_timelines(game, &mut stream)?;
+    read_objects(game, &mut stream)?;
+    read_rooms(game, &mut stream)?;
+
+    game.last_instance_id = stream.next_u32()?;
+    game.last_tile_id = stream.next_u32()?;
+
+    read_help(game, &mut stream)?;
+    read_library_init_scripts(game, &mut stream)?;
+    read_room_order(game, &mut stream)?;
+
+    // Garbage data here.
+
+    Ok(())
+}
+
 
 pub fn decode<T: Read + Seek>(stream: T) -> io::Result<Game> {
     let mut project = Game::default();
@@ -923,6 +986,7 @@ pub fn decode<T: Read + Seek>(stream: T) -> io::Result<Game> {
         match project.version {
             Version::Gm800 | Version::Gm810 => parse_gm8xx_exe(&mut project, &mut stream)?,
             Version::Gm700 => parse_gm700_exe(&mut project, &mut stream)?,
+            Version::Gm600 => parse_gm600_exe(&mut project, &mut stream)?,
             _ => unimplemented!()
         }
     }

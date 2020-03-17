@@ -127,6 +127,13 @@ pub fn decrypt_gm700<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> 
     Ok(Cursor::new(decrypted))
 }
 
+pub fn decrypt_gm600<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> {
+    // First uncompress, then decrypt.
+    let decompressed = stream.next_compressed()?;
+    let decrypted = deobfuscate(decompressed, 4, true, false)?;
+    Ok(Cursor::new(decrypted))
+}
+
 pub fn make_swap_table(seed: u32) -> [u8; 256] {
     let mut table0: [u8; 256] = [0; 256];
     let mut table1: [u8; 256] = [0; 256];
