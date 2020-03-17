@@ -47,15 +47,13 @@ impl<T: Read> GmStream for T {
 
     fn next_string(&mut self) -> io::Result<String> {
         let data = self.next_blob()?;
-        let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(&data);
-        let string = decoded.to_string();
-        Ok(string)
+        Ok(decode_string(&data))
     }
 
     fn next_blob(&mut self) -> io::Result<Vec<u8>> {
         let length = self.next_u32()?;
-        let mut data = Vec::with_capacity(length as usize);
-        self.take(length as u64).read_to_end(&mut data)?;
+        let mut data = vec![0; length as usize];
+        self.take(length as u64).read_exact(&mut data)?;
         Ok(data)
     }
 
@@ -81,4 +79,9 @@ impl<T: Read> GmStream for T {
         let length = GmStream::next_u32(self)?;
         self.skip(length)
     }
+}
+
+pub fn decode_string(data: &[u8]) -> String {
+    let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(data);
+    decoded.to_string()
 }

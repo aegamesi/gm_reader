@@ -2,7 +2,7 @@ mod gmstream;
 mod decrypt;
 mod detect;
 
-use gmstream::GmStream;
+use gmstream::{decode_string, GmStream};
 use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile, Include, Trigger, FontAtlasGlyph};
 use std::io;
 use std::io::{Read, Seek, Cursor};
@@ -784,7 +784,8 @@ fn read_help(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
         if version == 800 {
             game.help.content = stream.next_string()?;
         } else {
-            game.help.content = stream.next_compressed()?.next_string()?;
+            let data = stream.next_compressed()?.into_inner();
+            game.help.content = decode_string(&data);
         }
     } else {
         unimplemented!();
