@@ -922,18 +922,26 @@ fn parse_gm700_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result
 
 fn parse_gm600_exe(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     println!("Reading includes...");
-    let _export_folder = stream.next_u32()?;
-    let _overwrite = stream.next_bool()?;
-    let _remove_at_game_end = stream.next_bool()?;
-    loop {
-        let name = stream.next_string()?;
-        if "READY" == name {
-            break;
-        } else if "D3DX8.dll" == name {
-            stream.skip_blob()?;
-        } else {
-            // TODO actually save includes
-            stream.skip_blob()?;
+    {
+        let export_location = stream.next_u32()?;
+        let overwrite = stream.next_bool()?;
+        let remove_at_game_end = stream.next_bool()?;
+        loop {
+            let name = stream.next_string()?;
+            if "READY" == name {
+                break;
+            } else if "D3DX8.dll" == name {
+                stream.skip_blob()?;
+            } else {
+                let mut include = Include::default();
+                include.name = name;
+                include.data = stream.next_blob()?;
+                include.export = export_location;
+                include.overwrite = overwrite;
+                include.free_memory = true;
+                include.remove_at_end = remove_at_game_end;
+                game.includes.push(include);
+            }
         }
     }
 
