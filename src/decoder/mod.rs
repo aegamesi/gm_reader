@@ -3,11 +3,14 @@ mod decrypt;
 mod detect;
 
 use gmstream::{decode_string, GmStream};
-use crate::game::{Game, Version, Sound, Sprite, SpriteFrame, SpriteMask, Background, Path, PathPoint, Script, Font, Action, Timeline, TimelineMoment, Object, ObjectEvent, Constant, Room, RoomBackground, RoomView, RoomInstance, RoomTile, Include, Trigger, FontAtlasGlyph};
+use crate::game::*;
 use std::io;
 use std::io::{Read, Seek, Cursor};
 
+use image::ConvertBuffer;
+
 type BufferStream = Cursor<Vec<u8>>;
+type BgraImage = image::ImageBuffer<image::Bgra<u8>, Vec<u8>>;
 
 fn drain<T: Read>(mut s: T) -> io::Result<u64> {
     io::copy(&mut s, &mut io::sink())
@@ -359,11 +362,13 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
             if num_frames > 0 {
                 sprite.frames.reserve(num_frames);
                 for _ in 0..num_frames {
-                    let mut frame = SpriteFrame::default();
                     let _version = stream.next_u32()?;
-                    frame.size = (stream.next_u32()?, stream.next_u32()?);
-                    frame.data = stream.next_blob()?;
-                    sprite.frames.push(frame);
+                    let width = stream.next_u32()?;
+                    let height = stream.next_u32()?;
+                    let data = stream.next_blob()?;
+                    sprite.frames.push(Image {
+                        inner: BgraImage::from_raw(width, height, data).unwrap().convert(),
+                    });
                 }
 
                 let has_separate_masks = stream.next_bool()?;
@@ -413,7 +418,8 @@ fn read_backgrounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()
         let version = stream.next_u32()?;
         if version == 543 {
             // TODO: convert GM <8.0 background data
-            background.size = (stream.next_u32()?, stream.next_u32()?);
+            let _width = stream.next_u32()?;
+            let _height = stream.next_u32()?;
             let _transparent = stream.next_bool()?;
             let _smooth_edges = stream.next_bool()?;
             let _preload_texture = stream.next_bool()?;
@@ -427,10 +433,16 @@ fn read_backgrounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()
             }
         } else if version == 710 {
             let _version2 = stream.next_u32()?;
-            background.size = (stream.next_u32()?, stream.next_u32()?);
-            if background.size.0 > 0 && background.size.1 > 0 {
-                background.data = stream.next_blob()?;
-            }
+            let width = stream.next_u32()?;
+            let height = stream.next_u32()?;
+            let data = if width > 0 && height > 0 {
+                stream.next_blob()?
+            } else {
+                vec![]
+            };
+            background.image = Image {
+                inner: BgraImage::from_raw(width, height, data).unwrap().convert(),
+            };
         } else {
             unimplemented!();
         }
