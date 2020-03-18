@@ -390,7 +390,8 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
                     sprite.masks.push(mask);
                 }
             } else {
-                let _unknown = stream.next_u32()?; // Always 0?
+                // Weird, because if it has no frames it doesn't matter.
+                let _has_separate_masks = stream.next_bool()?;
             }
         } else {
             unimplemented!();
