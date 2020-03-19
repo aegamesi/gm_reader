@@ -25,10 +25,10 @@ pub fn decrypt_gm8xx<T: Read>(mut stream: T) -> Result<Cursor<Vec<u8>>> {
 
     // Phase 1.
     for i in (1..len).rev() {
-        let a = reverse_table[buf[i] as usize] as u64;
-        let b = buf[i - 1] as u64;
-        let c = a.wrapping_sub(b).wrapping_sub(i as u64);
-        buf[i] = c as u8;
+        let a = reverse_table[buf[i] as usize] as i32;
+        let b = buf[i - 1] as i32;
+        let c = a - b - (i as i32);
+        buf[i] = (c & 0xFF) as u8;
     }
 
     // Phase 2.
@@ -44,7 +44,11 @@ pub fn decrypt_gm8xx<T: Read>(mut stream: T) -> Result<Cursor<Vec<u8>>> {
         buf[b as usize] = a;
     }
 
-    Ok(Cursor::new(buf))
+    let mut stream = Cursor::new(buf);
+    let len = stream.next_u32()?;
+    stream.skip(len * 4)?;
+
+    Ok(stream)
 }
 
 pub fn decrypt_gm810<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> {
@@ -74,7 +78,6 @@ pub fn decrypt_gm810<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> 
     stream.read_to_end(&mut buf)?;
 
     let mut pos = ((seed2 & 0xFF) + 6) as usize;
-    println!("pos: {}", pos);
     while pos <= buf.len() - 4 {
         let chunk = &mut buf[pos..(pos + 4)];
         let mut input = [0u8; 4];

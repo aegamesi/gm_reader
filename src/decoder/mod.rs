@@ -900,11 +900,8 @@ fn parse_gm8xx_exe(game: &mut Game, mut stream: &mut BufferStream) -> io::Result
     stream.skip_blob()?;
     stream.skip_blob()?;
 
-    // Do the main "decryption" and skip junk.
     println!("Decrypting inner...");
     let mut stream = decrypt::decrypt_gm8xx(stream)?;
-    let len = stream.next_u32()?;
-    stream.skip(len * 4)?;
 
     game.pro = stream.next_bool()?;
     game.game_id = stream.next_u32()?;
