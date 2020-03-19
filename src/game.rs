@@ -150,7 +150,7 @@ pub struct Sprite {
     pub masks: Vec<SpriteMask>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct SpriteMask {
     pub size: (u32, u32),
     pub left: i32,

@@ -7,7 +7,7 @@ use crate::game::*;
 use std::io;
 use std::io::{Read, Seek, Cursor};
 
-use image::ConvertBuffer;
+use image::{ConvertBuffer, RgbaImage, Pixel};
 
 type BufferStream = Cursor<Vec<u8>>;
 type BgraImage = image::ImageBuffer<image::Bgra<u8>, Vec<u8>>;
@@ -335,25 +335,54 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
         sprite.name = stream.next_string()?;
         let version = stream.next_u32()?;
         if version == 542 {
-            // TODO: convert GM <8.0 sprite data
-            let _size = (stream.next_u32()?, stream.next_u32()?);
-            let _bb_left = stream.next_i32()?;
-            let _bb_right = stream.next_i32()?;
-            let _bb_bottom = stream.next_i32()?;
-            let _bb_top = stream.next_i32()?;
+            let mut base_mask = SpriteMask::default();
+            base_mask.size = (stream.next_u32()?, stream.next_u32()?);
+            base_mask.left = stream.next_i32()?;
+            base_mask.right = stream.next_i32()?;
+            base_mask.bottom = stream.next_i32()?;
+            base_mask.top = stream.next_i32()?;
             let _transparent = stream.next_bool()?;
             let _smooth_edges = stream.next_bool()?;
             let _preload = stream.next_bool()?;
             let _bb_type = stream.next_u32()?;
-            let _precise_collisions = stream.next_bool()?;
-            let _origin = (stream.next_i32()?, stream.next_i32()?);
+            let precise_collisions = stream.next_bool()?;
+            sprite.origin = (stream.next_i32()?, stream.next_i32()?);
             let num_frames = stream.next_u32()? as usize;
             for _ in 0..num_frames {
                 let _version = stream.next_u32()?;
                 let _present = stream.next_u32()?;
-                let _width = stream.next_u32()?;
-                let _height = stream.next_u32()?;
-                stream.skip_blob()?; // bitmap data
+                let width = stream.next_u32()?;
+                let height = stream.next_u32()?;
+                let data = stream.next_compressed()?.into_inner();
+                let image = RgbaImage::from_raw(width, height, data).unwrap();
+                sprite.frames.push(Image { inner: image })
+            }
+
+            if precise_collisions {
+                // If we have precise collisions, do a separate mask for each subimage based on transparency.
+                for frame in &sprite.frames {
+                    let mut mask = base_mask.clone();
+                    mask.size = (frame.inner.width(), frame.inner.height());
+                    mask.data.reserve((mask.size.0 * mask.size.1) as usize);
+                    for y in 0..mask.size.1 {
+                        for x in 0..mask.size.0 {
+                            mask.data.push(frame.inner.get_pixel(x, y).channels()[3] == 255);
+                        }
+                    }
+                    sprite.masks.push(mask);
+                }
+            } else {
+                // Otherwise copy the bounding box.
+                let mut mask = base_mask;
+                mask.data.reserve((mask.size.0 * mask.size.1) as usize);
+                for y in 0..mask.size.1 {
+                    for x in 0..mask.size.0 {
+                        let x = x as i32;
+                        let y = y as i32;
+                        mask.data.push(x >= mask.left && x <= mask.right && y >= mask.top && y <= mask.bottom);
+                    }
+                }
+                sprite.masks.push(mask);
             }
         } else if version == 800 {
             sprite.origin = (stream.next_i32()?, stream.next_i32()?);
@@ -418,7 +447,6 @@ fn read_backgrounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()
         background.name = stream.next_string()?;
         let version = stream.next_u32()?;
         if version == 543 {
-            // TODO: convert GM <8.0 background data
             let _width = stream.next_u32()?;
             let _height = stream.next_u32()?;
             let _transparent = stream.next_bool()?;
@@ -428,9 +456,11 @@ fn read_backgrounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()
             if has_image {
                 let _version = stream.next_u32()?;
                 let _present = stream.next_u32()?;
-                let _width = stream.next_u32()?;
-                let _height = stream.next_u32()?;
-                stream.skip_blob()?; // bitmap data
+                let width = stream.next_u32()?;
+                let height = stream.next_u32()?;
+                let data = stream.next_compressed()?.into_inner();
+                let image = RgbaImage::from_raw(width, height, data).unwrap();
+                background.image = Image { inner: image }
             }
         } else if version == 710 {
             let _version2 = stream.next_u32()?;
