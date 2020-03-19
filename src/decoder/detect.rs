@@ -18,8 +18,7 @@ fn detect_gm530<T: Read + Seek>(mut stream: &mut T) -> Result<Option<Vec<u8>>> {
     stream.seek(SeekFrom::Start(1500000))?;
     let magic = stream.next_u32()?;
     if magic == 1230500 {
-        let key = stream.next_u32()?;
-        let mut stream = decrypt::decrypt_gm530(&mut stream, key)?;
+        let mut stream = decrypt::decrypt_gm530(&mut stream)?;
 
         let _a = stream.next_u32()?;
         stream.skip_blob()?;

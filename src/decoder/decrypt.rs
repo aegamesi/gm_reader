@@ -95,30 +95,13 @@ pub fn decrypt_gm810<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> 
     Ok(Cursor::new(buf))
 }
 
-pub fn decrypt_gm530<T: Read + Seek>(stream: &mut T, key: u32) -> Result<Cursor<Vec<u8>>> {
-    let mut arr0: [u32; 256] = [0; 256];
-    let mut arr1: [u32; 256] = [0; 256];
+pub fn decrypt_gm530<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> {
+    let swap_seed = stream.next_u32()?;
+    let swap_table = make_generic_swap_table(swap_seed, 0);
 
-    for i in 0..256 {
-        arr0[i] = i as u32;
-    }
-    for i in 1..10001 {
-        let j = ((i * key) % 254 + 1) as usize;
-        let k = arr0[j];
-        arr0[j] = arr0[j + 1];
-        arr0[j + 1] = k;
-    }
-    for i in 1..256 {
-        arr1[arr0[i] as usize] = i as u32;
-    }
-
-    // Decrypt.
     let mut buf: Vec<u8> = Vec::new();
     stream.read_to_end(&mut buf)?;
-
-    for i in 0..buf.len() {
-        buf[i] = arr1[buf[i] as usize] as u8;
-    }
+    do_swap(&mut buf, swap_table, false, 0);
 
     Ok(Cursor::new(buf))
 }
@@ -126,23 +109,21 @@ pub fn decrypt_gm530<T: Read + Seek>(stream: &mut T, key: u32) -> Result<Cursor<
 pub fn decrypt_gm700<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> {
     // First uncompress, then decrypt.
     let decompressed = stream.next_compressed()?;
-    let decrypted = deobfuscate(decompressed, 0, true, true)?;
+    let decrypted = gmkrypt_decrypt(decompressed, 0, true, true)?;
     Ok(Cursor::new(decrypted))
 }
 
 pub fn decrypt_gm600<T: Read + Seek>(stream: &mut T) -> Result<Cursor<Vec<u8>>> {
     // First uncompress, then decrypt.
     let decompressed = stream.next_compressed()?;
-    let decrypted = deobfuscate(decompressed, 4, true, false)?;
+    let decrypted = gmkrypt_decrypt(decompressed, 4, true, false)?;
     Ok(Cursor::new(decrypted))
 }
 
-pub fn make_swap_table(seed: u32) -> [u8; 256] {
+fn make_generic_swap_table(a: u32, b: u32) -> [u8; 256] {
     let mut table0: [u8; 256] = [0; 256];
     let mut table1: [u8; 256] = [0; 256];
 
-    let a = 6 + (seed % 250);
-    let b = seed / 250;
     for i in 0..256 {
         table0[i] = i as u8;
     }
@@ -158,6 +139,12 @@ pub fn make_swap_table(seed: u32) -> [u8; 256] {
     table1
 }
 
+pub fn make_gmkrypt_swap_table(seed: u32) -> [u8; 256] {
+    let a = 6 + (seed % 250);
+    let b = seed / 250;
+    make_generic_swap_table(a, b)
+}
+
 pub fn do_swap(buffer: &mut [u8], table: [u8; 256], use_offset: bool, initial_offset: usize) {
     for i in 0..buffer.len() {
         let t = buffer[i] as usize;
@@ -170,7 +157,7 @@ pub fn do_swap(buffer: &mut [u8], table: [u8; 256], use_offset: bool, initial_of
     }
 }
 
-pub fn deobfuscate(mut input: Cursor<Vec<u8>>, initial_unencrypted: u64, has_garbage: bool, use_offset: bool) -> Result<Vec<u8>> {
+pub fn gmkrypt_decrypt(mut input: Cursor<Vec<u8>>, initial_unencrypted: u64, has_garbage: bool, use_offset: bool) -> Result<Vec<u8>> {
     let mut output = Cursor::new(Vec::new());
     let start_pos = input.seek(SeekFrom::Current(0))?;
 
@@ -191,7 +178,7 @@ pub fn deobfuscate(mut input: Cursor<Vec<u8>>, initial_unencrypted: u64, has_gar
     let swap_start = output.get_ref().len();
     let swap_length = copy(&mut input, &mut output)? as usize;
     let swap_offset = (end_pos - start_pos) as usize;
-    let swap_table = make_swap_table(swap_seed);
+    let swap_table = make_gmkrypt_swap_table(swap_seed);
     let mut output = output.into_inner();
     do_swap(&mut output[swap_start..(swap_start + swap_length)], swap_table, use_offset, swap_offset);
 

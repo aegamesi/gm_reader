@@ -255,7 +255,7 @@ fn read_extensions(_game: &mut Game, stream: &mut BufferStream) -> io::Result<()
 
         // Read file data.
         let encrypted = Cursor::new(stream.next_blob()?);
-        let decrypted = decrypt::deobfuscate(encrypted, 0, false, false)?;
+        let decrypted = decrypt::gmkrypt_decrypt(encrypted, 0, false, false)?;
         let mut decrypted = Cursor::new(decrypted);
         for file in &mut extension.files {
             file.data = decrypted.next_compressed()?.into_inner();
@@ -552,7 +552,7 @@ fn read_scripts(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
         let version = stream.next_u32()?;
         if version == 400 {
             let mut compressed = stream.next_compressed()?.into_inner();
-            let swap_table = decrypt::make_swap_table(12345);
+            let swap_table = decrypt::make_gmkrypt_swap_table(12345);
             decrypt::do_swap(&mut compressed, swap_table, false, 0);
             let mut decrypted = Cursor::new(compressed);
             script.script = decrypted.next_string()?;
