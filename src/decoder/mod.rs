@@ -53,44 +53,6 @@ impl Drop for SectionWrapper<'_> {
     }
 }
 
-fn read_action(stream: &mut SectionWrapper) -> io::Result<Action> {
-    let mut action = Action::default();
-    let version = stream.next_u32()?;
-    if version == 440 {
-        action.library_id = stream.next_u32()?;
-        action.action_id = stream.next_u32()?;
-        action.action_kind = stream.next_u32()?;
-        action.has_relative = stream.next_bool()?;
-        action.is_question = stream.next_bool()?;
-        action.has_target = stream.next_bool()?;
-        action.action_type = stream.next_u32()?;
-        action.name = stream.next_string()?;
-        action.code = stream.next_string()?;
-        action.parameters_used = stream.next_u32()?;
-
-        let num_parameters = stream.next_u32()?;
-        action.parameters.reserve(num_parameters as usize);
-        for _ in 0..num_parameters as usize {
-            action.parameters.push(stream.next_u32()?);
-        }
-
-        action.target = stream.next_i32()?;
-        action.relative = stream.next_bool()?;
-
-        let num_arguments = stream.next_u32()?;
-        action.arguments.reserve(num_arguments as usize);
-        for _ in 0..num_arguments as usize {
-            action.arguments.push(stream.next_string()?);
-        }
-
-        action.negate = stream.next_bool()?;
-    } else {
-        unimplemented!();
-    }
-
-    Ok(action)
-}
-
 fn read_actions(stream: &mut SectionWrapper) -> io::Result<Vec<Action>> {
     let mut actions = Vec::new();
     let version = stream.next_u32()?;
@@ -98,7 +60,40 @@ fn read_actions(stream: &mut SectionWrapper) -> io::Result<Vec<Action>> {
         let num_actions = stream.next_u32()?;
         actions.reserve(num_actions as usize);
         for _ in 0..num_actions {
-            actions.push(read_action(stream)?);
+            let mut action = Action::default();
+            let version = stream.next_u32()?;
+            if version == 440 {
+                action.library_id = stream.next_u32()?;
+                action.action_id = stream.next_u32()?;
+                action.action_kind = stream.next_u32()?;
+                action.has_relative = stream.next_bool()?;
+                action.is_question = stream.next_bool()?;
+                action.has_target = stream.next_bool()?;
+                action.action_type = stream.next_u32()?;
+                action.name = stream.next_string()?;
+                action.code = stream.next_string()?;
+                action.parameters_used = stream.next_u32()?;
+
+                let num_parameters = stream.next_u32()?;
+                action.parameters.reserve(num_parameters as usize);
+                for _ in 0..num_parameters as usize {
+                    action.parameters.push(stream.next_u32()?);
+                }
+
+                action.target = stream.next_i32()?;
+                action.relative = stream.next_bool()?;
+
+                let num_arguments = stream.next_u32()?;
+                action.arguments.reserve(num_arguments as usize);
+                for _ in 0..num_arguments as usize {
+                    action.arguments.push(stream.next_string()?);
+                }
+
+                action.negate = stream.next_bool()?;
+            } else {
+                unimplemented!();
+            }
+            actions.push(action);
         }
     } else {
         unimplemented!();
