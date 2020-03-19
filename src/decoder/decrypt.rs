@@ -167,7 +167,7 @@ pub fn do_swap(buffer: &mut [u8], table: [u8; 256], use_offset: bool, initial_of
     }
 }
 
-fn deobfuscate(mut input: Cursor<Vec<u8>>, initial_unencrypted: u64, has_garbage: bool, use_offset: bool) -> Result<Vec<u8>> {
+pub fn deobfuscate(mut input: Cursor<Vec<u8>>, initial_unencrypted: u64, has_garbage: bool, use_offset: bool) -> Result<Vec<u8>> {
     let mut output = Cursor::new(Vec::new());
     let start_pos = input.seek(SeekFrom::Current(0))?;
 

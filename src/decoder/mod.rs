@@ -204,7 +204,6 @@ fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
 }
 
 fn read_extensions(_game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
-    // TODO: finish reading extensions
     println!("Reading extensions...");
     let version = stream.next_u32()?;
     assert_eq!(version, 700);
@@ -256,14 +255,16 @@ fn read_extensions(_game: &mut Game, stream: &mut BufferStream) -> io::Result<()
                 constant.value = stream.next_string()?;
                 file.constants.push(constant);
             }
-
             extension.files.push(file);
         }
 
-        println!("{:?}", extension);
-
-        // read resources files?
-        stream.skip_blob()?;
+        // Read file data.
+        let encrypted = Cursor::new(stream.next_blob()?);
+        let decrypted = decrypt::deobfuscate(encrypted, 0, false, false)?;
+        let mut decrypted = Cursor::new(decrypted);
+        for file in &mut extension.files {
+            file.data = decrypted.next_compressed()?.into_inner();
+        }
     }
     Ok(())
 }

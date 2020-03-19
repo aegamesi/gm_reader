@@ -393,6 +393,7 @@ pub struct ExtensionFile {
     pub finalization_function: String,
     pub functions: Vec<ExtensionFunction>,
     pub constants: Vec<Constant>,
+    pub data: Vec<u8>,
 }
 
 #[derive(Default, Debug)]

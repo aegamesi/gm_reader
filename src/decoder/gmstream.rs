@@ -23,7 +23,7 @@ pub trait GmStream: Sized {
 
     fn next_compressed(&mut self) -> io::Result<io::Cursor<Vec<u8>>>;
 
-    fn skip_blob(&mut self) -> io::Result<()>;
+    fn skip_blob(&mut self) -> io::Result<u32>;
 }
 
 impl<T: Read> GmStream for T {
@@ -75,9 +75,10 @@ impl<T: Read> GmStream for T {
         Ok(cursor)
     }
 
-    fn skip_blob(&mut self) -> io::Result<()> {
+    fn skip_blob(&mut self) -> io::Result<u32> {
         let length = GmStream::next_u32(self)?;
-        self.skip(length)
+        self.skip(length)?;
+        Ok(length)
     }
 }
 
