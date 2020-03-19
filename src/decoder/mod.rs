@@ -206,40 +206,61 @@ fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
 fn read_extensions(_game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     // TODO: finish reading extensions
     println!("Reading extensions...");
-    let _version = stream.next_u32()?;
+    let version = stream.next_u32()?;
+    assert_eq!(version, 700);
     let num_extensions = stream.next_u32()?;
     for _ in 0..num_extensions {
-        stream.skip(4)?;
-        println!("Extension Name: {}", stream.next_string()?);
-        stream.skip_blob()?;
+        let version = stream.next_u32()?;
+        assert_eq!(version, 700);
+        let mut extension = Extension::default();
+        extension.name = stream.next_string()?;
+        extension.temp_name = stream.next_string()?;
 
-        let count = stream.next_u32()?;
-        for _ in 0..count {
-            stream.skip(4)?;
-            stream.skip_blob()?;
-            stream.skip(4)?;
-            stream.skip_blob()?;
-            stream.skip_blob()?;
+        let file_count = stream.next_u32()?;
+        for _ in 0..file_count {
+            let version = stream.next_u32()?;
+            assert_eq!(version, 700);
+            let mut file = ExtensionFile::default();
+            file.name = stream.next_string()?;
+            file.file_type = stream.next_u32()?;
+            file.initialization_function = stream.next_string()?;
+            file.finalization_function = stream.next_string()?;
 
-            // Args?
-            let count = stream.next_u32()?;
-            for _ in 0..count {
-                stream.skip(4)?;
-                stream.skip_blob()?;
-                stream.skip_blob()?;
-                stream.skip(4 * 3)?;
-
-                stream.skip(4 * 18)?;
+            let function_count = stream.next_u32()?;
+            for _ in 0..function_count {
+                let version = stream.next_u32()?;
+                assert_eq!(version, 700);
+                let mut function = ExtensionFunction::default();
+                function.name = stream.next_string()?;
+                function.external_name = stream.next_string()?;
+                function.calling_convention = stream.next_u32()?;
+                function.id = stream.next_u32()?;
+                let num_arguments = stream.next_i32()?;
+                for i in 0..17 {
+                    let argument_type = stream.next_u32()?;
+                    if i < num_arguments {
+                        function.argument_types.push(argument_type);
+                    }
+                }
+                function.return_type = stream.next_u32()?;
+                file.functions.push(function);
             }
 
             // Constants
-            let count = stream.next_u32()?;
-            for _ in 0..count {
-                stream.skip(4)?;
-                stream.skip_blob()?;
-                stream.skip_blob()?;
+            let num_constants = stream.next_u32()?;
+            for _ in 0..num_constants {
+                let version = stream.next_u32()?;
+                assert_eq!(version, 700);
+                let mut constant = Constant::default();
+                constant.name = stream.next_string()?;
+                constant.value = stream.next_string()?;
+                file.constants.push(constant);
             }
+
+            extension.files.push(file);
         }
+
+        println!("{:?}", extension);
 
         // read resources files?
         stream.skip_blob()?;

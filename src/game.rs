@@ -377,3 +377,31 @@ pub struct Help {
     pub freeze_game: bool,
     pub content: String,
 }
+
+#[derive(Default, Debug)]
+pub struct Extension {
+    pub name: String,
+    pub temp_name: String,
+    pub files: Vec<ExtensionFile>,
+}
+
+#[derive(Default, Debug)]
+pub struct ExtensionFile {
+    pub name: String,
+    pub file_type: u32,
+    pub initialization_function: String,
+    pub finalization_function: String,
+    pub functions: Vec<ExtensionFunction>,
+    pub constants: Vec<Constant>,
+}
+
+#[derive(Default, Debug)]
+pub struct ExtensionFunction {
+    pub name: String,
+    pub external_name: String,
+    pub calling_convention: u32,
+    pub id: u32,
+    // 1 for String, 2 (and others) for Real.
+    pub argument_types: Vec<u32>,
+    pub return_type: u32,
+}
