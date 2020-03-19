@@ -12,13 +12,9 @@ use image::{ConvertBuffer, RgbaImage, Pixel};
 type BufferStream = Cursor<Vec<u8>>;
 type BgraImage = image::ImageBuffer<image::Bgra<u8>, Vec<u8>>;
 
-fn drain<T: Read>(mut s: T) -> io::Result<u64> {
-    io::copy(&mut s, &mut io::sink())
-}
-
-fn assert_eof<T: Read>(s: T) {
-    let bytes_remaining = drain(s).unwrap();
-    assert_eq!(bytes_remaining, 0)
+fn assert_eof<T: Read>(mut s: T) {
+    let remaining = io::copy(&mut s, &mut io::sink()).unwrap();
+    assert_eq!(remaining, 0, "expected EOF but found {} more bytes", remaining)
 }
 
 enum SectionWrapper<'a> {
