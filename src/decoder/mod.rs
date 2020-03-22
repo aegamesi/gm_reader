@@ -7,7 +7,7 @@ use crate::game::*;
 use std::io;
 use std::io::{Read, Seek, Cursor};
 
-use image::{ConvertBuffer, RgbaImage, Pixel};
+use image::{ConvertBuffer, RgbaImage, GrayImage, Pixel};
 
 type BufferStream = Cursor<Vec<u8>>;
 type BgraImage = image::ImageBuffer<image::Bgra<u8>, Vec<u8>>;
@@ -586,22 +586,32 @@ fn read_fonts(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
             font.range_start = font.range_start & 0x0000FFFF;
 
             let num_glyphs = 256;
-            font.atlas.glyphs.reserve(num_glyphs);
+            let mut glyphs = vec![];
+            glyphs.reserve(num_glyphs);
             for _ in 0..num_glyphs {
                 let mut glyph = FontAtlasGlyph::default();
                 glyph.pos = (stream.next_u32()?, stream.next_u32()?);
                 glyph.size = (stream.next_u32()?, stream.next_u32()?);
                 glyph.horizontal_advance = stream.next_i32()?;
                 glyph.kerning = stream.next_i32()?;
-                font.atlas.glyphs.push(glyph);
+                glyphs.push(glyph);
             }
-            font.atlas.size = (stream.next_u32()?, stream.next_u32()?);
-
-            if version == 540 {
-                font.atlas.data = stream.next_compressed()?.into_inner();
+            let atlas_width = stream.next_u32()?;
+            let atlas_height = stream.next_u32()?;
+            let atlas_data = if version == 540 {
+                stream.next_compressed()?.into_inner()
             } else {
-                font.atlas.data = stream.next_blob()?;
-            }
+                stream.next_blob()?
+            };
+
+            font.atlas = Some(FontAtlas {
+                glyphs,
+                image: GrayImage::from_raw(
+                    atlas_width,
+                    atlas_height,
+                    atlas_data,
+                ).unwrap().convert(),
+            });
         } else {
             unimplemented!();
         }

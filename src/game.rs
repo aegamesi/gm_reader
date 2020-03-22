@@ -1,6 +1,6 @@
 extern crate image;
 
-use self::image::RgbaImage;
+use image::{RgbaImage, GrayImage};
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
 pub enum Version {
@@ -184,14 +184,13 @@ pub struct Font {
     pub range_end: u32,
     pub charset: u32,
     pub aa_level: u32,
-    pub atlas: FontAtlas,
+    pub atlas: Option<FontAtlas>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct FontAtlas {
     pub glyphs: Vec<FontAtlasGlyph>,
-    pub size: (u32, u32),
-    pub data: Vec<u8>,
+    pub image: GrayImage,
 }
 
 #[derive(Default, Debug)]
