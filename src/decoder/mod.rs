@@ -368,18 +368,18 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
                 let height = stream.next_u32()?;
                 let data = stream.next_compressed()?.into_inner();
                 let image = RgbaImage::from_raw(width, height, data).unwrap();
-                sprite.frames.push(Image { inner: image })
+                sprite.frames.push(image);
             }
 
             if precise_collisions {
                 // If we have precise collisions, do a separate mask for each subimage based on transparency.
                 for frame in &sprite.frames {
                     let mut mask = base_mask.clone();
-                    mask.size = (frame.inner.width(), frame.inner.height());
+                    mask.size = (frame.width(), frame.height());
                     mask.data.reserve((mask.size.0 * mask.size.1) as usize);
                     for y in 0..mask.size.1 {
                         for x in 0..mask.size.0 {
-                            mask.data.push(frame.inner.get_pixel(x, y).channels()[3] == 255);
+                            mask.data.push(frame.get_pixel(x, y).channels()[3] == 255);
                         }
                     }
                     sprite.masks.push(mask);
@@ -408,9 +408,7 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
                     let width = stream.next_u32()?;
                     let height = stream.next_u32()?;
                     let data = stream.next_blob()?;
-                    sprite.frames.push(Image {
-                        inner: BgraImage::from_raw(width, height, data).unwrap().convert(),
-                    });
+                    sprite.frames.push(BgraImage::from_raw(width, height, data).unwrap().convert());
                 }
 
                 let has_separate_masks = stream.next_bool()?;
@@ -472,8 +470,7 @@ fn read_backgrounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()
                 let width = stream.next_u32()?;
                 let height = stream.next_u32()?;
                 let data = stream.next_compressed()?.into_inner();
-                let image = RgbaImage::from_raw(width, height, data).unwrap();
-                background.image = Image { inner: image }
+                background.image = RgbaImage::from_raw(width, height, data);
             }
         } else if version == 710 {
             let _version2 = stream.next_u32()?;
@@ -484,9 +481,7 @@ fn read_backgrounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()
             } else {
                 vec![]
             };
-            background.image = Image {
-                inner: BgraImage::from_raw(width, height, data).unwrap().convert(),
-            };
+            background.image = Some(BgraImage::from_raw(width, height, data).unwrap().convert());
         } else {
             unimplemented!();
         }

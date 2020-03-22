@@ -1,6 +1,5 @@
 extern crate image;
 
-use std::fmt;
 use self::image::RgbaImage;
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
@@ -16,24 +15,6 @@ pub enum Version {
 impl Default for Version {
     fn default() -> Self {
         Version::Unknown
-    }
-}
-
-pub struct Image {
-    pub inner: RgbaImage,
-}
-
-impl Default for Image {
-    fn default() -> Self {
-        Image {
-            inner: RgbaImage::from_raw(0, 0, vec![]).unwrap(),
-        }
-    }
-}
-
-impl fmt::Debug for Image {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Image(w={}, h={})", self.inner.width(), self.inner.height())
     }
 }
 
@@ -146,7 +127,7 @@ pub struct Sprite {
     pub name: String,
     pub origin: (i32, i32),
 
-    pub frames: Vec<Image>,
+    pub frames: Vec<RgbaImage>,
     pub masks: Vec<SpriteMask>,
 }
 
@@ -164,7 +145,7 @@ pub struct SpriteMask {
 pub struct Background {
     pub id: u32,
     pub name: String,
-    pub image: Image,
+    pub image: Option<RgbaImage>,
 }
 
 #[derive(Default, Debug)]
