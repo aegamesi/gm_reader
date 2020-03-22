@@ -17,6 +17,12 @@ fn assert_eof<T: Read>(mut s: T) {
     assert_eq!(remaining, 0, "expected EOF but found {} more bytes", remaining)
 }
 
+fn read_image(data: &[u8]) -> io::Result<RgbaImage> {
+    Ok(image::load_from_memory(&data)
+        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?
+        .into_rgba())
+}
+
 enum SectionWrapper<'a> {
     Owned(BufferStream),
     Borrowed(&'a mut BufferStream),
@@ -143,28 +149,18 @@ fn read_settings(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
     game.settings.loading_bar = stream.next_u32()?;
     if game.settings.loading_bar > 0 {
         if stream.next_bool()? {
-            game.settings.loading_bar_back = if game.version >= Version::Gm800 {
-                Some(stream.next_blob()?)
-            } else {
-                Some(stream.next_compressed()?.into_inner())
-            };
+            let data = stream.next_compressed()?.into_inner();
+            game.settings.loading_bar_back = Some(read_image(&data)?);
         }
         if stream.next_bool()? {
-            game.settings.loading_bar_front = if game.version >= Version::Gm800 {
-                Some(stream.next_blob()?)
-            } else {
-                Some(stream.next_compressed()?.into_inner())
-            };
+            let data = stream.next_compressed()?.into_inner();
+            game.settings.loading_bar_front = Some(read_image(&data)?);
         }
     }
 
-    game.settings.loading_background = None;
     if stream.next_bool()? {
-        game.settings.loading_background = if game.version >= Version::Gm800 {
-            Some(stream.next_blob()?)
-        } else {
-            Some(stream.next_compressed()?.into_inner())
-        };
+        let data = stream.next_compressed()?.into_inner();
+        game.settings.loading_background = Some(read_image(&data)?);
     }
 
     game.settings.load_transparent = stream.next_bool()?;

@@ -77,9 +77,9 @@ pub struct Settings {
     pub freeze: bool,
 
     pub loading_bar: u32,
-    pub loading_bar_back: Option<Vec<u8>>,
-    pub loading_bar_front: Option<Vec<u8>>,
-    pub loading_background: Option<Vec<u8>>,
+    pub loading_bar_back: Option<RgbaImage>,
+    pub loading_bar_front: Option<RgbaImage>,
+    pub loading_background: Option<RgbaImage>,
 
     pub load_transparent: bool,
     pub load_alpha: u32,
