@@ -1,8 +1,7 @@
-extern crate image;
-
 use image::{RgbaImage};
+use serde::Serialize;
 
-#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Serialize)]
 pub enum Version {
     Unknown = 0,
     Gm530 = 530,
@@ -18,16 +17,17 @@ impl Default for Version {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum ColorType {
     Rgba,
     Gray,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Image {
     pub width: u32,
     pub height: u32,
+    #[serde(with = "serde_bytes")]
     pub data: Vec<u8>,
     pub color_type: ColorType,
 }
@@ -54,7 +54,7 @@ impl From<RgbaImage> for Image {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize)]
 pub struct Game {
     pub version: Version,
     pub debug: bool,
@@ -84,7 +84,7 @@ pub struct Game {
     pub room_order: Vec<u32>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Settings {
     pub fullscreen: bool,
     pub interpolation: bool,
@@ -128,7 +128,7 @@ pub struct Settings {
     pub uninitialized_arguments_error: bool,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Trigger {
     pub id: u32,
     pub name: String,
@@ -137,19 +137,21 @@ pub struct Trigger {
     pub constant_name: String,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Constant {
     pub name: String,
     pub value: String,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Sound {
     pub id: u32,
     pub name: String,
     pub kind: u32,
     pub filetype: String,
     pub filename: String,
+
+    #[serde(with = "serde_bytes")]
     pub data: Vec<u8>,
     pub effects: u32,
     pub volume: f64,
@@ -157,7 +159,7 @@ pub struct Sound {
     pub preload: bool,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Sprite {
     pub id: u32,
     pub name: String,
@@ -167,7 +169,7 @@ pub struct Sprite {
     pub masks: Vec<SpriteMask>,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize)]
 pub struct SpriteMask {
     pub size: (u32, u32),
     pub left: i32,
@@ -177,14 +179,14 @@ pub struct SpriteMask {
     pub data: Vec<bool>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Background {
     pub id: u32,
     pub name: String,
     pub image: Image,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Path {
     pub id: u32,
     pub name: String,
@@ -194,21 +196,21 @@ pub struct Path {
     pub points: Vec<PathPoint>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct PathPoint {
     pub x: f64,
     pub y: f64,
     pub speed: f64,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Script {
     pub id: u32,
     pub name: String,
     pub script: String,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Font {
     pub id: u32,
     pub name: String,
@@ -223,13 +225,13 @@ pub struct Font {
     pub atlas: FontAtlas,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct FontAtlas {
     pub glyphs: Vec<FontAtlasGlyph>,
     pub image: Image,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct FontAtlasGlyph {
     pub pos: (u32, u32),
     pub size: (u32, u32),
@@ -237,7 +239,7 @@ pub struct FontAtlasGlyph {
     pub kerning: i32,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Action {
     pub library_id: u32,
     pub action_id: u32,
@@ -256,20 +258,20 @@ pub struct Action {
     pub negate: bool,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Timeline {
     pub id: u32,
     pub name: String,
     pub moments: Vec<TimelineMoment>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct TimelineMoment {
     pub position: u32,
     pub actions: Vec<Action>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Object {
     pub id: u32,
     pub name: String,
@@ -283,14 +285,14 @@ pub struct Object {
     pub events: Vec<ObjectEvent>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct ObjectEvent {
     pub event_type: u32,
     pub event_number: i32,
     pub actions: Vec<Action>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Room {
     pub id: u32,
     pub name: String,
@@ -309,7 +311,7 @@ pub struct Room {
     pub tiles: Vec<RoomTile>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct RoomBackground {
     pub visible: bool,
     pub foreground: bool,
@@ -323,7 +325,7 @@ pub struct RoomBackground {
     pub stretch: bool,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct RoomView {
     pub visible: bool,
     pub view_x: u32,
@@ -341,7 +343,7 @@ pub struct RoomView {
     pub target_object: i32,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct RoomInstance {
     pub x: i32,
     pub y: i32,
@@ -350,7 +352,7 @@ pub struct RoomInstance {
     pub creation_code: String,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct RoomTile {
     pub x: i32,
     pub y: i32,
@@ -363,13 +365,15 @@ pub struct RoomTile {
     pub id: i32,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Include {
     pub name: String,
     pub original_path: String,
     pub original_chosen: bool,
     pub original_size: u32,
     pub store_in_editable: bool,
+
+    #[serde(with = "serde_bytes")]
     pub data: Vec<u8>,
     pub export: u32,
     pub export_folder: String,
@@ -378,7 +382,7 @@ pub struct Include {
     pub remove_at_end: bool,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Help {
     pub background_color: u32,
     pub separate_window: bool,
@@ -394,14 +398,14 @@ pub struct Help {
     pub content: String,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Extension {
     pub name: String,
     pub temp_name: String,
     pub files: Vec<ExtensionFile>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct ExtensionFile {
     pub name: String,
     pub file_type: u32,
@@ -409,10 +413,12 @@ pub struct ExtensionFile {
     pub finalization_function: String,
     pub functions: Vec<ExtensionFunction>,
     pub constants: Vec<Constant>,
+
+    #[serde(with = "serde_bytes")]
     pub data: Vec<u8>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct ExtensionFunction {
     pub name: String,
     pub external_name: String,

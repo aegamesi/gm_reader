@@ -3,7 +3,8 @@ use std::io::BufReader;
 use std::{env, process};
 
 struct Config {
-    filename: String,
+    input: String,
+    output: Option<String>,
 }
 
 impl Config {
@@ -13,7 +14,8 @@ impl Config {
         }
 
         Ok(Config {
-            filename: args[1].clone(),
+            input: args[1].clone(),
+            output: args.get(2).cloned(),
         })
     }
 }
@@ -26,12 +28,19 @@ fn main() -> Result<(), std::io::Error> {
         process::exit(1);
     });
 
-    println!("Reading {}", config.filename);
-    let file = File::open(config.filename)?;
+    println!("Reading {}", config.input);
+    let file = File::open(config.input)?;
     let file = BufReader::new(file);
 
     let project = gm_reader::decode(file)?;
     println!("Read game with version {:?}", project.version);
+
+    if let Some(output) = config.output {
+        println!("Writing MessagePack to {}.", output);
+        let mut f = std::fs::File::create(output)?;
+        rmp_serde::encode::write(&mut f, &project).unwrap();
+        println!("Done.");
+    }
 
     Ok(())
 }
