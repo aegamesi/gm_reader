@@ -7,7 +7,7 @@ use crate::game::*;
 use std::io;
 use std::io::{Read, Seek, Cursor};
 
-use image::{ConvertBuffer, RgbaImage, GrayImage, Pixel};
+use image::{ConvertBuffer, RgbaImage};
 
 type BufferStream = Cursor<Vec<u8>>;
 type BgraImage = image::ImageBuffer<image::Bgra<u8>, Vec<u8>>;
@@ -17,10 +17,11 @@ fn assert_eof<T: Read>(mut s: T) {
     assert_eq!(remaining, 0, "expected EOF but found {} more bytes", remaining)
 }
 
-fn read_image(data: &[u8]) -> io::Result<RgbaImage> {
+fn read_image(data: &[u8]) -> io::Result<Image> {
     Ok(image::load_from_memory(&data)
         .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?
-        .into_rgba())
+        .into_rgba()
+        .into())
 }
 
 enum SectionWrapper<'a> {
@@ -363,21 +364,16 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
                 let width = stream.next_u32()?;
                 let height = stream.next_u32()?;
                 let data = stream.next_compressed()?.into_inner();
-                let image = RgbaImage::from_raw(width, height, data).unwrap();
-                sprite.frames.push(image);
+                let image: RgbaImage = BgraImage::from_raw(width, height, data).unwrap().convert();
+                sprite.frames.push(image.into());
             }
 
             if precise_collisions {
                 // If we have precise collisions, do a separate mask for each subimage based on transparency.
                 for frame in &sprite.frames {
                     let mut mask = base_mask.clone();
-                    mask.size = (frame.width(), frame.height());
-                    mask.data.reserve((mask.size.0 * mask.size.1) as usize);
-                    for y in 0..mask.size.1 {
-                        for x in 0..mask.size.0 {
-                            mask.data.push(frame.get_pixel(x, y).channels()[3] == 255);
-                        }
-                    }
+                    mask.size = (frame.width, frame.height);
+                    mask.data = frame.data.iter().skip(3).step_by(4).map(|x| *x == 255).collect();
                     sprite.masks.push(mask);
                 }
             } else {
@@ -404,7 +400,8 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
                     let width = stream.next_u32()?;
                     let height = stream.next_u32()?;
                     let data = stream.next_blob()?;
-                    sprite.frames.push(BgraImage::from_raw(width, height, data).unwrap().convert());
+                    let image: RgbaImage = BgraImage::from_raw(width, height, data).unwrap().convert();
+                    sprite.frames.push(image.into());
                 }
 
                 let has_separate_masks = stream.next_bool()?;
@@ -466,7 +463,8 @@ fn read_backgrounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()
                 let width = stream.next_u32()?;
                 let height = stream.next_u32()?;
                 let data = stream.next_compressed()?.into_inner();
-                background.image = RgbaImage::from_raw(width, height, data);
+                let image: RgbaImage = BgraImage::from_raw(width, height, data).unwrap().convert();
+                background.image = image.into();
             }
         } else if version == 710 {
             let _version2 = stream.next_u32()?;
@@ -477,7 +475,8 @@ fn read_backgrounds(game: &mut Game, stream: &mut BufferStream) -> io::Result<()
             } else {
                 vec![]
             };
-            background.image = Some(BgraImage::from_raw(width, height, data).unwrap().convert());
+            let image: RgbaImage = BgraImage::from_raw(width, height, data).unwrap().convert();
+            background.image = image.into();
         } else {
             unimplemented!();
         }
@@ -592,22 +591,13 @@ fn read_fonts(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
                 glyph.kerning = stream.next_i32()?;
                 glyphs.push(glyph);
             }
-            let atlas_width = stream.next_u32()?;
-            let atlas_height = stream.next_u32()?;
-            let atlas_data = if version == 540 {
+            font.atlas.image.width = stream.next_u32()?;
+            font.atlas.image.height = stream.next_u32()?;
+            font.atlas.image.data = if version == 540 {
                 stream.next_compressed()?.into_inner()
             } else {
                 stream.next_blob()?
             };
-
-            font.atlas = Some(FontAtlas {
-                glyphs,
-                image: GrayImage::from_raw(
-                    atlas_width,
-                    atlas_height,
-                    atlas_data,
-                ).unwrap().convert(),
-            });
         } else {
             unimplemented!();
         }

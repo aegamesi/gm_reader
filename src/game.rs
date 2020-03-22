@@ -1,6 +1,6 @@
 extern crate image;
 
-use image::{RgbaImage, GrayImage};
+use image::{RgbaImage};
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
 pub enum Version {
@@ -15,6 +15,42 @@ pub enum Version {
 impl Default for Version {
     fn default() -> Self {
         Version::Unknown
+    }
+}
+
+#[derive(Debug)]
+pub enum ColorType {
+    Rgba,
+    Gray,
+}
+
+#[derive(Debug)]
+pub struct Image {
+    pub width: u32,
+    pub height: u32,
+    pub data: Vec<u8>,
+    pub color_type: ColorType,
+}
+
+impl Default for Image {
+    fn default() -> Self {
+        Image {
+            width: 0,
+            height: 0,
+            data: vec![],
+            color_type: ColorType::Rgba,
+        }
+    }
+}
+
+impl From<RgbaImage> for Image {
+    fn from(other: RgbaImage) -> Self {
+        Image {
+            width: other.width(),
+            height: other.height(),
+            data: other.into_raw(),
+            color_type: ColorType::Rgba,
+        }
     }
 }
 
@@ -77,9 +113,9 @@ pub struct Settings {
     pub freeze: bool,
 
     pub loading_bar: u32,
-    pub loading_bar_back: Option<RgbaImage>,
-    pub loading_bar_front: Option<RgbaImage>,
-    pub loading_background: Option<RgbaImage>,
+    pub loading_bar_back: Option<Image>,
+    pub loading_bar_front: Option<Image>,
+    pub loading_background: Option<Image>,
 
     pub load_transparent: bool,
     pub load_alpha: u32,
@@ -127,7 +163,7 @@ pub struct Sprite {
     pub name: String,
     pub origin: (i32, i32),
 
-    pub frames: Vec<RgbaImage>,
+    pub frames: Vec<Image>,
     pub masks: Vec<SpriteMask>,
 }
 
@@ -145,7 +181,7 @@ pub struct SpriteMask {
 pub struct Background {
     pub id: u32,
     pub name: String,
-    pub image: Option<RgbaImage>,
+    pub image: Image,
 }
 
 #[derive(Default, Debug)]
@@ -184,13 +220,13 @@ pub struct Font {
     pub range_end: u32,
     pub charset: u32,
     pub aa_level: u32,
-    pub atlas: Option<FontAtlas>,
+    pub atlas: FontAtlas,
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct FontAtlas {
     pub glyphs: Vec<FontAtlasGlyph>,
-    pub image: GrayImage,
+    pub image: Image,
 }
 
 #[derive(Default, Debug)]
