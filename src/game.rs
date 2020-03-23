@@ -1,4 +1,4 @@
-use image::{RgbaImage};
+use image::RgbaImage;
 use serde::Serialize;
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Serialize)]

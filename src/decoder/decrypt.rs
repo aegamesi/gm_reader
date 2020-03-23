@@ -1,6 +1,6 @@
 extern crate crc;
 
-use std::io::{Cursor, Read, Result, Seek, SeekFrom, copy};
+use std::io::{copy, Cursor, Read, Result, Seek, SeekFrom};
 
 use super::gmstream::GmStream;
 
@@ -157,7 +157,12 @@ pub fn do_swap(buffer: &mut [u8], table: [u8; 256], use_offset: bool, initial_of
     }
 }
 
-pub fn gmkrypt_decrypt(mut input: Cursor<Vec<u8>>, initial_unencrypted: u64, has_garbage: bool, use_offset: bool) -> Result<Vec<u8>> {
+pub fn gmkrypt_decrypt(
+    mut input: Cursor<Vec<u8>>,
+    initial_unencrypted: u64,
+    has_garbage: bool,
+    use_offset: bool,
+) -> Result<Vec<u8>> {
     let mut output = Cursor::new(Vec::new());
     let start_pos = input.seek(SeekFrom::Current(0))?;
 
@@ -180,7 +185,12 @@ pub fn gmkrypt_decrypt(mut input: Cursor<Vec<u8>>, initial_unencrypted: u64, has
     let swap_offset = (end_pos - start_pos) as usize;
     let swap_table = make_gmkrypt_swap_table(swap_seed);
     let mut output = output.into_inner();
-    do_swap(&mut output[swap_start..(swap_start + swap_length)], swap_table, use_offset, swap_offset);
+    do_swap(
+        &mut output[swap_start..(swap_start + swap_length)],
+        swap_table,
+        use_offset,
+        swap_offset,
+    );
 
     Ok(output)
 }

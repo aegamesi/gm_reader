@@ -1,11 +1,11 @@
-mod gmstream;
 mod decrypt;
 mod detect;
+mod gmstream;
 
-use gmstream::{decode_string, GmStream};
 use crate::game::*;
+use gmstream::{decode_string, GmStream};
 use std::io;
-use std::io::{Read, Seek, Cursor};
+use std::io::{Cursor, Read, Seek};
 
 use image::{ConvertBuffer, RgbaImage};
 
@@ -14,7 +14,11 @@ type BgraImage = image::ImageBuffer<image::Bgra<u8>, Vec<u8>>;
 
 fn assert_eof<T: Read>(mut s: T) {
     let remaining = io::copy(&mut s, &mut io::sink()).unwrap();
-    assert_eq!(remaining, 0, "expected EOF but found {} more bytes", remaining)
+    assert_eq!(
+        remaining, 0,
+        "expected EOF but found {} more bytes",
+        remaining
+    )
 }
 
 fn read_image(data: &[u8]) -> io::Result<Image> {
@@ -373,7 +377,13 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
                 for frame in &sprite.frames {
                     let mut mask = base_mask.clone();
                     mask.size = (frame.width, frame.height);
-                    mask.data = frame.data.iter().skip(3).step_by(4).map(|x| *x == 255).collect();
+                    mask.data = frame
+                        .data
+                        .iter()
+                        .skip(3)
+                        .step_by(4)
+                        .map(|x| *x == 255)
+                        .collect();
                     sprite.masks.push(mask);
                 }
             } else {
@@ -384,7 +394,9 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
                     for x in 0..mask.size.0 {
                         let x = x as i32;
                         let y = y as i32;
-                        mask.data.push(x >= mask.left && x <= mask.right && y >= mask.top && y <= mask.bottom);
+                        mask.data.push(
+                            x >= mask.left && x <= mask.right && y >= mask.top && y <= mask.bottom,
+                        );
                     }
                 }
                 sprite.masks.push(mask);
@@ -400,7 +412,8 @@ fn read_sprites(game: &mut Game, stream: &mut BufferStream) -> io::Result<()> {
                     let width = stream.next_u32()?;
                     let height = stream.next_u32()?;
                     let data = stream.next_blob()?;
-                    let image: RgbaImage = BgraImage::from_raw(width, height, data).unwrap().convert();
+                    let image: RgbaImage =
+                        BgraImage::from_raw(width, height, data).unwrap().convert();
                     sprite.frames.push(image.into());
                 }
 
@@ -1029,7 +1042,6 @@ fn parse_gm600_exe(game: &mut Game, stream: &mut BufferStream) -> io::Result<()>
     Ok(())
 }
 
-
 pub fn decode<T: Read + Seek>(stream: T) -> io::Result<Game> {
     let mut project = Game::default();
     project.version = Version::Unknown;
@@ -1042,7 +1054,7 @@ pub fn decode<T: Read + Seek>(stream: T) -> io::Result<Game> {
             Version::Gm800 | Version::Gm810 => parse_gm8xx_exe(&mut project, &mut stream)?,
             Version::Gm700 => parse_gm700_exe(&mut project, &mut stream)?,
             Version::Gm600 => parse_gm600_exe(&mut project, &mut stream)?,
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 

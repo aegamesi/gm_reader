@@ -1,7 +1,7 @@
-use std::io::{Read, Seek, SeekFrom, Result};
-use crate::game::Version;
-use super::gmstream::GmStream;
 use super::decrypt;
+use super::gmstream::GmStream;
+use crate::game::Version;
+use std::io::{Read, Result, Seek, SeekFrom};
 
 pub struct GameData {
     pub data: Vec<u8>,
@@ -35,9 +35,9 @@ fn detect_gm530<T: Read + Seek>(mut stream: &mut T) -> Result<Option<Vec<u8>>> {
 
 fn detect_gm600<T: Read + Seek>(stream: &mut T) -> Result<Option<Vec<u8>>> {
     let offsets = [
-        (0, -1), // Raw game data
-        (700000, 457832), // GM 6.0
-        (800000, 486668), // GM 6.1
+        (0, -1),            // Raw game data
+        (700000, 457832),   // GM 6.0
+        (800000, 486668),   // GM 6.1
         (1420000, 1296488), // GM 6.0 with Vista support
         (1600000, 1393932), // GM 6.1 with Vista support
     ];
@@ -86,7 +86,7 @@ fn detect_gm810<T: Read + Seek>(mut stream: &mut T) -> Result<Option<Vec<u8>>> {
                 if magic == 0 && version == 0 {
                     return Ok(Some(read_rest(&mut stream)?));
                 } else {
-                    return Ok(None)
+                    return Ok(None);
                 }
             }
         }
@@ -103,15 +103,13 @@ pub fn decode<T: Read + Seek>(mut stream: T) -> Option<GameData> {
         (Version::Gm800, detect_gm800),
         (Version::Gm810, detect_gm810),
     ];
-    detectors.iter().find_map(|(version, detector)| {
-        match detector(&mut stream) {
-            Ok(Some(data)) => {
-                Some(GameData {
-                    data,
-                    version: *version,
-                })
-            }
-            _ => None
-        }
-    })
+    detectors
+        .iter()
+        .find_map(|(version, detector)| match detector(&mut stream) {
+            Ok(Some(data)) => Some(GameData {
+                data,
+                version: *version,
+            }),
+            _ => None,
+        })
 }
